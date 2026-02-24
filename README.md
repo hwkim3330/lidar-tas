@@ -32,18 +32,40 @@ UDP 7502           802.1Qbv          Python socket
 - **최대 Burst**: 5ms / 20% open → **68.9%** (gate open 시 일괄 방출)
 - **최대 Inter-Packet Gap**: 50ms / 20% open → **41ms**
 
+## 실시간 서버
+
+3D 포인트 클라우드 뷰어 + 실시간 TAS 제어 웹 UI:
+
+```bash
+# 의존성 설치
+pip3 install flask flask-cors ouster-sdk numpy requests
+
+# 서버 실행
+python3 scripts/lidar_tas_server.py
+# → http://localhost:8080
+```
+
+기능:
+- Three.js 3D LiDAR 포인트 클라우드 실시간 렌더링
+- LAN9662 스위치에 실시간 TAS 설정 변경 (keti-tsn-cli 연동)
+- Cycle time (1/5/10/50ms) × Open % (100/80/50/20) 프리셋
+- 프레임 Completeness, Jitter, Burst, PPS 실시간 모니터링
+- EMA 스무딩으로 안정적인 통계 표시
+- TAS Sweep 자동 테스트 (13개 설정 순차 적용)
+
 ## 파일 구조
 
 ```
-├── index.html              # 시각화 (GitHub Pages)
+├── index.html                    # 결과 시각화 (GitHub Pages)
 ├── data/
 │   ├── sweep_results.json        # Extended sweep (1ms ~ 50ms)
 │   └── sweep_1ms_results.json    # 1ms cycle sweep
 ├── configs/
-│   ├── tas-enable.yaml     # TAS 활성화 (keti-tsn-cli용)
-│   ├── tas-disable.yaml    # TAS 비활성화 (all-open)
-│   └── fetch-tas.yaml      # TAS 상태 조회
+│   ├── tas-enable.yaml           # TAS 활성화 (keti-tsn-cli용)
+│   ├── tas-disable.yaml          # TAS 비활성화 (all-open)
+│   └── fetch-tas.yaml            # TAS 상태 조회
 ├── scripts/
+│   ├── lidar_tas_server.py       # 실시간 3D 뷰어 + TAS 제어 서버
 │   ├── tas_sweep.py              # 1ms cycle sweep
 │   ├── tas_sweep_extended.py     # Extended sweep
 │   ├── measure_tas.py            # 단순 패킷 카운트
@@ -77,6 +99,12 @@ npm install
 ```bash
 python3 scripts/tas_sweep_extended.py
 ```
+
+## 주의사항
+
+- TAS 비활성화 시 `gate-enabled: false`를 사용하면 안 됨 — gate가 닫힌 상태로 고정됨
+- 대신 `gate-enabled: true` + 단일 all-open GCL 항목 사용 (tas-disable.yaml 참고)
+- LAN9662 TC0 큐 버퍼 크기 ~30-40 패킷 추정, 이를 초과하면 드롭 발생
 
 ## 도구
 
