@@ -32,6 +32,23 @@ UDP 7502           802.1Qbv          Python socket
 - **최대 Burst**: 5ms / 20% open → **68.9%** (gate open 시 일괄 방출)
 - **최대 Inter-Packet Gap**: 50ms / 20% open → **41ms**
 
+## Jitter 원인 진단
+
+All-open 상태에서도 stdev ~170µs의 jitter가 관측되어 원인 분석 수행:
+
+| 설정 | Gap StdDev | P99 | Burst% | 비고 |
+|------|-----------|-----|--------|------|
+| All-Open (1ms cycle) | 173 µs | 1271 µs | 0.3% | baseline |
+| All-Open (10ms cycle) | 182 µs | 1282 µs | 0.2% | baseline |
+| All-Open (100ms cycle) | 167 µs | 1251 µs | 0.2% | baseline |
+
+**결론**: TAS cycle time 변경에 무관하게 jitter 동일 → **TAS gate 전환이 원인 아님**
+
+원인:
+- **USB Ethernet 어댑터**: URB 스케줄링 간격 (125µs~1ms)
+- **스위치 Store-and-Forward**: 3,328B 패킷 수신 후 전달 시 가변 큐잉 지연
+- **OS 커널 스케줄링**: socket.recvfrom() 유저스페이스 전환 지연
+
 ## 실시간 서버
 
 3D 포인트 클라우드 뷰어 + 실시간 TAS 제어 웹 UI:
@@ -59,13 +76,15 @@ python3 scripts/lidar_tas_server.py
 ├── index.html                    # 결과 시각화 (GitHub Pages)
 ├── data/
 │   ├── sweep_results.json        # Extended sweep (1ms ~ 50ms)
-│   └── sweep_1ms_results.json    # 1ms cycle sweep
+│   ├── sweep_1ms_results.json    # 1ms cycle sweep
+│   └── jitter_diagnosis.json     # Jitter 원인 진단 결과
 ├── configs/
 │   ├── tas-enable.yaml           # TAS 활성화 (keti-tsn-cli용)
 │   ├── tas-disable.yaml          # TAS 비활성화 (all-open)
 │   └── fetch-tas.yaml            # TAS 상태 조회
 ├── scripts/
 │   ├── lidar_tas_server.py       # 실시간 3D 뷰어 + TAS 제어 서버
+│   ├── jitter_diagnosis.py       # Jitter 원인 진단 (8개 설정 비교)
 │   ├── tas_sweep.py              # 1ms cycle sweep
 │   ├── tas_sweep_extended.py     # Extended sweep
 │   ├── measure_tas.py            # 단순 패킷 카운트

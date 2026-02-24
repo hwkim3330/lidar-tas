@@ -313,6 +313,52 @@ svg { width: 100%; overflow: visible; }
   </div>
 </div>
 
+<!-- Jitter Diagnosis -->
+<div class="card full" style="border-color: var(--accent2);">
+  <h2 style="color: var(--accent2);">Jitter 원인 진단</h2>
+  <div class="note" style="border-left-color: var(--accent2); margin-bottom:15px;">
+    게이트가 전부 열려있는데도 stdev ~170µs 수준의 jitter가 관측됨. 원인을 파악하기 위해
+    TAS cycle time을 1ms/10ms/100ms로 변경하면서 all-open 상태의 jitter를 비교 측정.
+  </div>
+
+  <table class="result-table" id="diagTable"></table>
+
+  <div style="margin-top:20px;">
+    <h3 style="font-size:0.95em; color: var(--accent2); margin-bottom:10px;">결론</h3>
+    <div style="font-size:0.9em; line-height:1.8;">
+      <p><strong>TAS gate 전환은 원인이 아님.</strong> All-open 상태에서 cycle time을 1ms→10ms→100ms로 변경해도
+      jitter(stdev)가 167~182µs로 거의 동일. Gate 전환 주기와 무관한 일정한 jitter가 존재.</p>
+
+      <p style="margin-top:10px;"><strong>원인 분석:</strong></p>
+      <ul style="padding-left: 20px; color: var(--text2);">
+        <li><strong>USB Ethernet 어댑터</strong>: URB (USB Request Block) 스케줄링 간격으로 인한 패킷 도착 시간 편차. USB 2.0/3.0 폴링 간격(125µs~1ms)이 패킷 타이밍에 영향</li>
+        <li><strong>스위치 Store-and-Forward</strong>: LAN9662는 cut-through가 아닌 store-and-forward 방식. 3,328B 패킷의 수신 완료 후 전달까지 ~26.6µs + 가변 큐잉 지연</li>
+        <li><strong>OS 스케줄링</strong>: Python socket.recvfrom() 호출 시 커널 → 유저스페이스 전환 지연</li>
+      </ul>
+
+      <p style="margin-top:10px;"><strong>정량 분석 (All-Open 평균):</strong></p>
+      <ul style="padding-left: 20px; color: var(--text2);">
+        <li>정상 범위(500~1200µs): <strong>~91%</strong> — 대부분 정상</li>
+        <li>P99 지연: <strong>~1270µs</strong> (예상 781µs 대비 +63%)</li>
+        <li>Burst (&lt;50µs): <strong>~0.2%</strong> — 프레임 경계 재동기화</li>
+        <li>Large gap (&gt;1200µs): <strong>~2.7%</strong> — OS/USB 스케줄링 지연</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Histogram Chart -->
+<div class="card full">
+  <h2>패킷 간격 분포 (All-Open vs Gated)</h2>
+  <svg id="chartHistogram" height="350"></svg>
+</div>
+
+<!-- Per-frame jitter comparison -->
+<div class="card full">
+  <h2>Per-Frame Jitter 비교</h2>
+  <svg id="chartPerFrame" height="300"></svg>
+</div>
+
 </div>
 
 <script>
@@ -415,6 +461,153 @@ barChart('chartJitter', 'gapSD', 'Jitter — Gap StdDev (µs)', v => v.toFixed(0
 barChart('chartBurst', 'burst', 'Burst Rate (%)', v => v.toFixed(1)+'%');
 barChart('chartMaxGap', 'gapMax', 'Max Inter-Packet Gap (µs)', v =>
   v >= 1000 ? (v/1000).toFixed(1)+'ms' : v.toFixed(0)+'µs');
+
+// ── Jitter Diagnosis Data ──
+const diagData = [
+  { label: "All-Open (1ms)", cycle: 1000, pkts: 12801, mean: 781.3, stdev: 173.0, p99: 1271, max: 1980, burst: 0.3, normal: 91.3, large: 2.6, pfJitter: 154.1, pfMin: 13.6, pfMax: 374.6 },
+  { label: "All-Open (10ms)", cycle: 10000, pkts: 12801, mean: 781.2, stdev: 182.2, p99: 1282, max: 1775, burst: 0.2, normal: 89.4, large: 3.3, pfJitter: 161.5, pfMin: 13.3, pfMax: 403.2 },
+  { label: "All-Open (100ms)", cycle: 100000, pkts: 12801, mean: 781.3, stdev: 166.7, p99: 1251, max: 1800, burst: 0.2, normal: 91.2, large: 2.4, pfJitter: 156.3, pfMin: 7.3, pfMax: 379.6 },
+  { label: "1ms / 80%", cycle: 1000, pkts: 12801, mean: 781.2, stdev: 234.5, p99: 1287, max: 2164, burst: 0.4, normal: 84.5, large: 2.6, pfJitter: 225.2, pfMin: 102.6, pfMax: 393.4 },
+  { label: "1ms / 50%", cycle: 1000, pkts: 12801, mean: 781.2, stdev: 342.6, p99: 1304, max: 1995, burst: 4.2, normal: 75.3, large: 2.3, pfJitter: 333.8, pfMin: 218.4, pfMax: 451.3 },
+  { label: "5ms / 80%", cycle: 5000, pkts: 12801, mean: 781.3, stdev: 443.5, p99: 1919, max: 2521, burst: 10.3, normal: 63.9, large: 15.5, pfJitter: 295.3, pfMin: 186.3, pfMax: 457.0 },
+  { label: "10ms / 50%", cycle: 10000, pkts: 12800, mean: 781.3, stdev: 165.6, p99: 1265, max: 1932, burst: 0.2, normal: 91.5, large: 2.5, pfJitter: 149.4, pfMin: 29.7, pfMax: 358.8 },
+  { label: "50ms / 20%", cycle: 50000, pkts: 6532, mean: 1531.2, stdev: 6963.4, p99: 40878, max: 41625, burst: 56.5, normal: 33.9, large: 3.6, pfJitter: 357.7, pfMin: 122.1, pfMax: 398.7 },
+];
+
+// Diagnosis table
+const dt = d3.select('#diagTable');
+const dHead = dt.append('thead').append('tr');
+['Config', 'Packets', 'Gap Mean', 'StdDev', 'P99', 'Max', 'Burst%', 'Normal%', 'Frame Jitter'].forEach(h =>
+  dHead.append('th').text(h));
+const dBody = dt.append('tbody');
+diagData.forEach(d => {
+  const tr = dBody.append('tr');
+  const isOpen = d.label.startsWith('All-Open');
+  if (isOpen) tr.style('background', 'rgba(124,92,252,0.08)');
+  tr.append('td').text(d.label);
+  tr.append('td').text(d.pkts.toLocaleString());
+  tr.append('td').text(d.mean.toFixed(0) + 'µs');
+  const sdTd = tr.append('td').text(d.stdev.toFixed(0) + 'µs');
+  if (isOpen) sdTd.style('color', '#7c5cfc').style('font-weight', 'bold');
+  tr.append('td').text(d.p99.toFixed(0) + 'µs');
+  tr.append('td').text(d.max >= 10000 ? (d.max/1000).toFixed(1)+'ms' : d.max.toFixed(0) + 'µs');
+  tr.append('td').text(d.burst.toFixed(1) + '%');
+  tr.append('td').text(d.normal.toFixed(1) + '%');
+  tr.append('td').text(d.pfJitter.toFixed(0) + 'µs');
+});
+
+// ── Histogram: All-Open vs Gated ──
+(function() {
+  const histBins = ['<50', '50-200', '200-600', '600-780', '780-850', '850-1200', '>1200'];
+  // Approximate from diagnosis data
+  const openHist = [0.2, 0.3, 8.6, 35.7, 35.4, 12.4, 2.4];    // All-Open (100ms)
+  const gatedHist = [4.2, 7.2, 12.5, 4.5, 12.1, 56.5, 2.4];   // 1ms/50%
+  const lossHist = [56.5, 4.3, 2.9, 17.1, 12.3, 2.8, 3.6];    // 50ms/20%
+
+  const svg = d3.select('#chartHistogram');
+  const bbox = svg.node().getBoundingClientRect();
+  const margin = { top: 30, right: 20, bottom: 60, left: 60 };
+  const w = bbox.width - margin.left - margin.right;
+  const h = 350 - margin.top - margin.bottom;
+  const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+  const x0 = d3.scaleBand().domain(histBins).range([0, w]).padding(0.25);
+  const x1 = d3.scaleBand().domain(['open','gated','loss']).range([0, x0.bandwidth()]).padding(0.05);
+  const y = d3.scaleLinear().domain([0, 60]).range([h, 0]);
+
+  g.selectAll('.grid-line').data(y.ticks(5)).enter()
+    .append('line').attr('class','grid-line').attr('x1',0).attr('x2',w).attr('y1',d=>y(d)).attr('y2',d=>y(d));
+
+  const colors = { open: '#7c5cfc', gated: '#00d2ff', loss: '#ff5252' };
+  const datasets = [
+    { key: 'open', data: openHist, label: 'All-Open (100ms)' },
+    { key: 'gated', data: gatedHist, label: '1ms / 50%' },
+    { key: 'loss', data: lossHist, label: '50ms / 20%' },
+  ];
+
+  histBins.forEach((bin, i) => {
+    datasets.forEach(ds => {
+      g.append('rect')
+        .attr('x', x0(bin) + x1(ds.key))
+        .attr('y', y(ds.data[i]))
+        .attr('width', x1.bandwidth())
+        .attr('height', h - y(ds.data[i]))
+        .attr('fill', colors[ds.key])
+        .attr('opacity', 0.8)
+        .attr('rx', 2);
+    });
+  });
+
+  g.append('g').attr('class','axis').attr('transform',`translate(0,${h})`)
+    .call(d3.axisBottom(x0)).selectAll('text').attr('font-size','10px');
+  g.append('g').attr('class','axis').call(d3.axisLeft(y).ticks(5));
+  g.append('text').attr('transform','rotate(-90)').attr('x',-h/2).attr('y',-45)
+    .attr('text-anchor','middle').attr('fill','#8899aa').attr('font-size','12px').text('Packets (%)');
+  g.append('text').attr('x',w/2).attr('y',h+45)
+    .attr('text-anchor','middle').attr('fill','#8899aa').attr('font-size','12px').text('Inter-Packet Gap (µs)');
+
+  // Legend
+  const leg = g.append('g').attr('transform', `translate(${w-250}, -10)`);
+  datasets.forEach((ds, i) => {
+    leg.append('rect').attr('x', i*90).attr('y',0).attr('width',10).attr('height',10).attr('fill',colors[ds.key]).attr('rx',2);
+    leg.append('text').attr('x', i*90+14).attr('y',9).attr('fill','#c8d6e5').attr('font-size','10px').text(ds.label);
+  });
+})();
+
+// ── Per-frame jitter chart ──
+(function() {
+  const svg = d3.select('#chartPerFrame');
+  const bbox = svg.node().getBoundingClientRect();
+  const margin = { top: 20, right: 30, bottom: 60, left: 70 };
+  const w = bbox.width - margin.left - margin.right;
+  const h = 300 - margin.top - margin.bottom;
+  const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+  const x = d3.scaleBand().domain(diagData.map(d=>d.label)).range([0, w]).padding(0.2);
+  const y = d3.scaleLinear().domain([0, 500]).range([h, 0]);
+
+  g.selectAll('.grid-line').data(y.ticks(5)).enter()
+    .append('line').attr('class','grid-line').attr('x1',0).attr('x2',w).attr('y1',d=>y(d)).attr('y2',d=>y(d));
+
+  // Error bars (min-max range)
+  diagData.filter(d=>d.label!=='50ms / 20%').forEach(d => {
+    const cx = x(d.label) + x.bandwidth()/2;
+    g.append('line').attr('x1',cx).attr('x2',cx)
+      .attr('y1',y(d.pfMin)).attr('y2',y(d.pfMax))
+      .attr('stroke','#445').attr('stroke-width',2);
+    g.append('line').attr('x1',cx-6).attr('x2',cx+6).attr('y1',y(d.pfMin)).attr('y2',y(d.pfMin)).attr('stroke','#445').attr('stroke-width',2);
+    g.append('line').attr('x1',cx-6).attr('x2',cx+6).attr('y1',y(d.pfMax)).attr('y2',y(d.pfMax)).attr('stroke','#445').attr('stroke-width',2);
+  });
+
+  // Mean dots
+  g.selectAll('.dot').data(diagData.filter(d=>d.label!=='50ms / 20%')).enter()
+    .append('circle')
+    .attr('cx', d => x(d.label) + x.bandwidth()/2)
+    .attr('cy', d => y(d.pfJitter))
+    .attr('r', 6)
+    .attr('fill', d => d.label.startsWith('All-Open') ? '#7c5cfc' : '#00d2ff')
+    .attr('stroke', '#fff').attr('stroke-width', 1.5);
+
+  // Value labels
+  g.selectAll('.val').data(diagData.filter(d=>d.label!=='50ms / 20%')).enter()
+    .append('text')
+    .attr('x', d => x(d.label) + x.bandwidth()/2)
+    .attr('y', d => y(d.pfJitter) - 12)
+    .attr('text-anchor', 'middle').attr('fill', '#c8d6e5').attr('font-size', '10px')
+    .text(d => d.pfJitter.toFixed(0) + 'µs');
+
+  // Baseline band
+  g.append('rect').attr('x',0).attr('y',y(182)).attr('width',w).attr('height',y(155)-y(182))
+    .attr('fill','#7c5cfc').attr('opacity',0.1);
+  g.append('text').attr('x',w-5).attr('y',y(175)).attr('text-anchor','end')
+    .attr('fill','#7c5cfc').attr('font-size','9px').text('All-Open baseline band');
+
+  g.append('g').attr('class','axis').attr('transform',`translate(0,${h})`)
+    .call(d3.axisBottom(x)).selectAll('text').attr('transform','rotate(-30)').style('text-anchor','end');
+  g.append('g').attr('class','axis').call(d3.axisLeft(y).ticks(5));
+  g.append('text').attr('transform','rotate(-90)').attr('x',-h/2).attr('y',-55)
+    .attr('text-anchor','middle').attr('fill','#8899aa').attr('font-size','12px').text('Per-Frame Jitter StdDev (µs)');
+})();
 </script>
 </body>
 </html>
