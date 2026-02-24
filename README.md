@@ -29,11 +29,11 @@ UDP 7502           802.1Qbv          Python socket
 
 | 항목 | 결과 |
 |------|------|
-| 총 테스트 수 | 56 (기본 13 + 종합 43) |
-| 카테고리 | 8 (기본 sweep, 1ms sweep, jitter 진단, sub-ms, 버퍼, 프레임 정렬, multi-GCL, boundary) |
-| 100% 수신 | 36/43 (종합), 12/13 (기본) |
-| Total Loss (0%) | 7개 설정 |
-| 측정 시간 | ~13분 (종합 43개) |
+| 총 테스트 수 | 86 (기본 13 + 종합 43 + Multi-TC 30) |
+| 카테고리 | 13 (기본 8 + Multi-TC 5) |
+| 100% 수신 | 36/43 (종합), 25/30 (Multi-TC), 12/13 (기본) |
+| Total Loss (0%) | 12개 설정 |
+| 측정 시간 | ~19분 (종합 13min + Multi-TC 6min) |
 
 ### 기본 Sweep (13 configs)
 
@@ -189,6 +189,109 @@ All-open 상태에서도 stdev ~170µs의 jitter가 관측되어 원인 분석 �
 - **스위치 Store-and-Forward**: 3,328B 패킷 수신 후 전달 시 가변 큐잉 지연
 - **OS 커널 스케줄링**: socket.recvfrom() 유저스페이스 전환 지연
 
+## Multi-TC TAS 스케줄링 (ROII-Style)
+
+Per-TC gate bitmask를 사용한 자동차 자율주행 네트워크 시뮬레이션. 실제 LiDAR(TC0) 트래픽에 ROII 센서 프로필 적용.
+
+### Gate Bitmask
+
+| Gate Value | Binary | Open TC | 용도 |
+|-----------|--------|---------|------|
+| 0x01 | 00000001 | TC0 | LiDAR 전용 |
+| 0x40 | 01000000 | TC6 | Radar 시뮬 |
+| 0x20 | 00100000 | TC5 | Camera 시뮬 |
+| 0x04 | 00000100 | TC2 | Control 시뮬 |
+| 0xFF | 11111111 | 전체 | Guard band |
+
+### Cat A: TC0 Allocation Sweep (8 tests)
+
+10ms cycle, TC0(0x01)→TC6(0x40)→TC2(0x04). TC0 할당 1~8ms sweep.
+
+| Config | TC0 | TC0% | Completeness | Gap SD | Burst% |
+|--------|-----|------|-------------|--------|--------|
+| TC0=1ms | 1ms | 10% | **100%** | 2565µs | 79.5% |
+| TC0=2ms | 2ms | 20% | **0%** | — | — |
+| TC0=3ms | 3ms | 30% | **100%** | 2023µs | 63.9% |
+| TC0=4ms | 4ms | 40% | **0%** | — | — |
+| TC0=5ms | 5ms | 50% | **100%** | 1450µs | 45.0% |
+| TC0=6ms | 6ms | 60% | **100%** | 175µs | 0.2% |
+| TC0=7ms | 7ms | 70% | **100%** | 892µs | 22.8% |
+| TC0=8ms | 8ms | 80% | **100%** | 159µs | 0.1% |
+
+TC0=2ms, 4ms에서 beat frequency로 total loss. TC0% 증가가 반드시 개선을 의미하지 않음.
+
+### Cat B: Fragmentation Effect (6 tests)
+
+동일 TC0 총 시간(4ms)을 분산 vs 집중 배치.
+
+| Config | Windows | Completeness | Gap SD | Burst% |
+|--------|---------|-------------|--------|--------|
+| 1×4ms (contiguous) | 1 | **100%** | 1749µs | 51.2% |
+| 2×2ms (split) | 2 | **100%** | **181µs** | 0.2% |
+| 3×1.3ms (fragmented) | 3 | **100%** | 1032µs | 45.5% |
+| 5×1ms (high freq) | 5 | **100%** | **162µs** | 0.2% |
+| 4×0.5ms (ultra-fast) | 4 | **100%** | 1844µs | 56.8% |
+| 1×2ms (half baseline) | 1 | **0%** | — | — |
+
+**핵심**: 분산 배치(2×2ms, 5×1ms)가 집중 배치(1×4ms)보다 jitter 10배 감소!
+
+### Cat C: Cycle Time Scaling (6 tests)
+
+ROII 비율 고정 (TC0=40%, TC6=30%, TC2=20%, Guard=10%), cycle만 변경.
+
+| Cycle | TC0 | Completeness | Gap SD | Burst% |
+|-------|-----|-------------|--------|--------|
+| 2ms | 0.8ms | **100%** | 685µs | 24.6% |
+| 5ms | 2ms | **100%** | 1039µs | 34.1% |
+| 10ms | 4ms | **100%** | 1452µs | 43.7% |
+| 20ms | 8ms | **100%** | **160µs** | 0.1% |
+| 50ms | 20ms | **100%** | 3515µs | 33.7% |
+| 100ms | 40ms | **100%** | **175µs** | 0.3% |
+
+20ms와 100ms에서 baseline급 안정. 50ms에서 close=25ms로 burst 증가.
+
+### Cat D: ROII Realistic Profiles (5 tests)
+
+10ms cycle, 자동차 센서 프로필. 5-entry GCL: TC0→TC6→TC5→TC2→Guard.
+
+| Profile | TC0 | TC6 | TC5 | TC2 | Guard | Eff TC0% | Completeness | Gap SD |
+|---------|-----|-----|-----|-----|-------|----------|-------------|--------|
+| ROII-Standard | 4ms | 2.5ms | 1.5ms | 1ms | 1ms | 50% | **100%** | 1451µs |
+| LiDAR-Heavy | 6ms | 1.5ms | 1ms | 0.5ms | 1ms | 70% | **100%** | **186µs** |
+| Radar-Heavy | 2ms | 5ms | 1ms | 1ms | 1ms | 30% | **100%** | 2005µs |
+| Camera-Heavy | 2ms | 1ms | 5ms | 1ms | 1ms | 30% | **0%** | — |
+| Equal-Share | 2ms | 2ms | 2ms | 2ms | 2ms | 40% | **100%** | 1739µs |
+
+LiDAR-Heavy(TC0=6ms+Guard=70%)가 가장 안정. Camera-Heavy에서 beat frequency로 total loss.
+
+### Cat E: Guard Band Effect (5 tests)
+
+TC0=4ms 고정, Guard(0xFF) 크기 변화. Guard는 TC0 포함.
+
+| Guard | Eff TC0 | Completeness | Gap SD |
+|-------|---------|-------------|--------|
+| 0ms | 4ms (40%) | **100%** | 159µs |
+| 1ms | 5ms (50%) | **100%** | 1452µs |
+| 2ms | 6ms (60%) | **0%** | — |
+| 3ms | 7ms (70%) | **100%** | 882µs |
+| 6ms | 10ms (100%) | **100%** | 172µs |
+
+Guard=2ms(eff 60%)에서 total loss — beat frequency. Guard band 자체가 TC0 open 역할.
+
+### Multi-TC 핵심 발견
+
+1. **TC0% 증가 ≠ 안정성 증가**: beat frequency가 지배적
+2. **분산 배치 >> 집중 배치**: 2×2ms(181µs) vs 1×4ms(1749µs) — 10배 개선
+3. **Guard band = TC0 확장**: 0xFF는 TC0 포함이므로 effective TC0 시간 증가
+4. **LiDAR-Heavy 프로필 권장**: TC0=6ms + Guard=1ms (70% effective)
+
+### Multi-TC 설계 가이드라인
+
+- TC0 슬롯을 2개 이상으로 분산 배치
+- Guard band(0xFF)를 TC0 직후에 배치
+- LiDAR TC에 ≥ 60% effective open 할당
+- 20ms 또는 100ms cycle 사용 (beat frequency 동기화)
+
 ## 실시간 서버
 
 3D 포인트 클라우드 뷰어 + 실시간 TAS 제어 웹 UI:
@@ -207,7 +310,8 @@ python3 scripts/lidar_tas_server.py
 │   ├── sweep_results.json        # Extended sweep (1ms ~ 50ms)
 │   ├── sweep_1ms_results.json    # 1ms cycle sweep
 │   ├── jitter_diagnosis.json     # Jitter 원인 진단 결과
-│   └── comprehensive_results.json # 종합 테스트 (43 configs)
+│   ├── comprehensive_results.json # 종합 테스트 (43 configs)
+│   └── multitc_results.json      # Multi-TC 테스트 (30 configs)
 ├── configs/
 │   ├── tas-enable.yaml           # TAS 활성화 (keti-tsn-cli용)
 │   ├── tas-disable.yaml          # TAS 비활성화 (all-open)
@@ -215,6 +319,7 @@ python3 scripts/lidar_tas_server.py
 ├── scripts/
 │   ├── lidar_tas_server.py       # 실시간 3D 뷰어 + TAS 제어 서버
 │   ├── tas_comprehensive_suite.py # 종합 테스트 스위트 (6 categories, 43 configs)
+│   ├── tas_multitc_suite.py      # Multi-TC 테스트 (5 categories, 30 configs)
 │   ├── jitter_diagnosis.py       # Jitter 원인 진단 (8개 설정 비교)
 │   ├── tas_sweep.py              # 1ms cycle sweep
 │   ├── tas_sweep_extended.py     # Extended sweep

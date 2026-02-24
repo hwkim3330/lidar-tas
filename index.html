@@ -585,6 +585,201 @@ svg { width: 100%; overflow: visible; }
   </div>
 </div>
 
+<!-- ================================================================== -->
+<!-- MULTI-TC TAS SCHEDULING (ROII-Style) -->
+<!-- ================================================================== -->
+
+<div class="section-divider">
+  <h1>Multi-TC TAS 스케줄링</h1>
+  <div class="sub">ROII-Style Per-TC Gate Bitmask &middot; 5 categories &middot; 30 tests &middot; Automotive Sensor Profiles</div>
+</div>
+
+<!-- Multi-TC Overview -->
+<div class="card full" style="border-color: var(--accent);">
+  <h2>ROII 센서-TC 매핑 &amp; Gate Bitmask</h2>
+  <div style="font-size:0.9em; line-height:1.8; margin-bottom:15px;">
+    <p>자동차 자율주행 네트워크(ROII)에서 각 센서는 고유한 Traffic Class(TC)에 매핑됩니다.
+    LAN9662의 8-bit gate-states-value를 사용하여 per-TC 시간 슬롯을 제어합니다.</p>
+  </div>
+  <div style="display:flex; gap:15px; flex-wrap:wrap; margin-bottom:15px;">
+    <div class="setup-box" style="background:#1a3a2a; border:1px solid var(--green); flex:1; min-width:130px;">
+      <div><strong>TC0 (0x01)</strong></div>
+      <div class="setup-label">LiDAR<br>Ouster OS-1<br>34 Mbps</div>
+    </div>
+    <div class="setup-box" style="background:#2a2a1a; border:1px solid var(--yellow); flex:1; min-width:130px;">
+      <div><strong>TC6 (0x40)</strong></div>
+      <div class="setup-label">Radar<br>MRR-35<br>1.3 Mbps</div>
+    </div>
+    <div class="setup-box" style="background:#2a1a2a; border:1px solid var(--accent2); flex:1; min-width:130px;">
+      <div><strong>TC5 (0x20)</strong></div>
+      <div class="setup-label">Camera<br>Simulated<br>20 Mbps</div>
+    </div>
+    <div class="setup-box" style="background:#1a2a3a; border:1px solid var(--accent); flex:1; min-width:130px;">
+      <div><strong>TC2 (0x04)</strong></div>
+      <div class="setup-label">Control<br>CAN/Ethernet<br>0.5 Mbps</div>
+    </div>
+    <div class="setup-box" style="background:#2a2a2a; border:1px solid #666; flex:1; min-width:130px;">
+      <div><strong>0xFF (Guard)</strong></div>
+      <div class="setup-label">All TCs Open<br>Guard Band<br>TC0 포함</div>
+    </div>
+  </div>
+  <table class="spec-table">
+    <tr><th>Gate Value</th><th>Binary</th><th>Open TC</th><th>용도</th></tr>
+    <tr><td>0x01</td><td style="font-family:monospace;color:var(--green)">00000001</td><td>TC0</td><td>LiDAR 전용 슬롯</td></tr>
+    <tr><td>0x40</td><td style="font-family:monospace;color:var(--yellow)">01000000</td><td>TC6</td><td>Radar 시뮬레이션</td></tr>
+    <tr><td>0x20</td><td style="font-family:monospace;color:var(--accent2)">00100000</td><td>TC5</td><td>Camera 시뮬레이션</td></tr>
+    <tr><td>0x04</td><td style="font-family:monospace;color:var(--accent)">00000100</td><td>TC2</td><td>Control 시뮬레이션</td></tr>
+    <tr><td>0xFF</td><td style="font-family:monospace;color:#888">11111111</td><td>전체</td><td>Guard band (TC0 포함!)</td></tr>
+  </table>
+  <div class="note" style="margin-top:15px;">
+    실제 트래픽은 LiDAR(TC0)뿐이지만, 다른 TC gate가 열려도 TC0은 해당 슬롯에서 차단됩니다.
+    Guard band(0xFF)는 TC0을 포함하므로 실질 TC0 시간 = TC0 슬롯 + Guard 슬롯.
+  </div>
+</div>
+
+<!-- Multi-TC Summary Cards -->
+<div class="findings">
+  <div class="finding green">
+    <div class="value">30</div>
+    <div class="label">Multi-TC 테스트<br>5개 카테고리</div>
+  </div>
+  <div class="finding green">
+    <div class="value">25/30</div>
+    <div class="label">100% 수신<br>(beat freq 영향 5건)</div>
+  </div>
+  <div class="finding orange">
+    <div class="value">Beat</div>
+    <div class="label">비결정적 동기화<br>TC0%와 무관</div>
+  </div>
+  <div class="finding purple">
+    <div class="value">6.2 min</div>
+    <div class="label">총 측정 시간<br>(2026-02-24)</div>
+  </div>
+</div>
+
+<!-- Cat A: TC0 Allocation Sweep -->
+<div class="card full" style="border-color: var(--green);">
+  <h2 style="color: var(--green);">Cat A: TC0 Allocation Sweep</h2>
+  <div class="note" style="border-left-color: var(--green); margin-bottom:15px;">
+    10ms cycle, 3-entry: TC0(0x01) &rarr; TC6(0x40) &rarr; TC2(0x04).
+    TC0 할당을 1ms(10%)~8ms(80%)까지 sweep.
+    <strong>발견: TC0=2ms, 4ms에서 total loss &mdash; beat frequency 효과!</strong>
+    TC0% 증가가 반드시 개선을 의미하지 않음.
+  </div>
+  <table class="result-table" id="tc0SweepTable"></table>
+  <svg id="chartTc0Sweep" height="350"></svg>
+</div>
+
+<!-- Cat B: Fragmentation Effect -->
+<div class="card full" style="border-color: var(--accent);">
+  <h2 style="color: var(--accent);">Cat B: Fragmentation Effect</h2>
+  <div class="note" style="border-left-color: var(--accent); margin-bottom:15px;">
+    동일한 TC0 총 시간(4ms, 40%)을 다르게 분배. 1개 블록 vs 여러 블록.
+    <strong>핵심 발견: 분산 배치(2&times;2ms, 5&times;1ms)가 집중 배치(1&times;4ms)보다 훨씬 안정적!</strong>
+    Jitter: 1749&micro;s(1&times;4ms) &rarr; 181&micro;s(2&times;2ms) &rarr; 162&micro;s(5&times;1ms).
+  </div>
+  <table class="result-table" id="fragTable"></table>
+  <svg id="chartFragGantt" height="300"></svg>
+  <svg id="chartFragCompare" height="300"></svg>
+</div>
+
+<!-- Cat C: Cycle Time Scaling -->
+<div class="card full" style="border-color: var(--accent2);">
+  <h2 style="color: var(--accent2);">Cat C: Cycle Time Scaling (ROII 비율 고정)</h2>
+  <div class="note" style="border-left-color: var(--accent2); margin-bottom:15px;">
+    ROII 비율 고정: TC0=40%, TC6=30%, TC2=20%, Guard=10%. Cycle만 2ms&rarr;100ms.
+    <strong>20ms와 100ms에서 baseline급 안정 (stdev 160~175&micro;s). 50ms에서 close=25ms로 burst 증가.</strong>
+    TC0 effective open = 40% + 10%(guard) = 50%.
+  </div>
+  <table class="result-table" id="cycleScaleTable"></table>
+  <svg id="chartCycleScale" height="300"></svg>
+</div>
+
+<!-- Cat D: ROII Realistic Profiles -->
+<div class="card full" style="border-color: var(--yellow);">
+  <h2 style="color: var(--yellow);">Cat D: ROII Realistic Profiles</h2>
+  <div class="note" style="border-left-color: var(--yellow); margin-bottom:15px;">
+    10ms cycle, 5개 자동차 센서 프로필. 5-entry GCL: TC0 &rarr; TC6 &rarr; TC5 &rarr; TC2 &rarr; Guard.
+    <strong>LiDAR-Heavy(TC0=6ms+Guard=1ms=70%)가 가장 안정. Camera-Heavy에서 total loss(beat freq).</strong>
+  </div>
+  <table class="result-table" id="roiiTable"></table>
+  <svg id="chartRoiiGantt" height="300"></svg>
+  <svg id="chartRoiiCompare" height="300"></svg>
+</div>
+
+<!-- Cat E: Guard Band Effect -->
+<div class="card full" style="border-color: var(--orange);">
+  <h2 style="color: var(--orange);">Cat E: Guard Band Effect</h2>
+  <div class="note" style="border-left-color: var(--orange); margin-bottom:15px;">
+    TC0=4ms 고정, Guard band(0xFF) 크기 변화. Guard는 TC0 포함이므로 effective TC0 증가.
+    <strong>Guard=2ms(eff 60%)에서 total loss, Guard=3ms(eff 70%)에서 100% &mdash; beat frequency.</strong>
+    Guard band 자체가 TC0 open 역할도 함.
+  </div>
+  <table class="result-table" id="guardTable"></table>
+  <svg id="chartGuard" height="300"></svg>
+</div>
+
+<!-- Multi-TC Key Discovery -->
+<div class="card full" style="border-color: var(--accent2); background: rgba(124,92,252,0.05);">
+  <h2 style="color: var(--accent2);">핵심 발견: Per-TC Bitmask vs Beat Frequency</h2>
+  <div style="font-size:0.9em; line-height:1.8;">
+    <p><strong>Per-TC gate bitmask를 사용해도 beat frequency 동기화 효과는 동일하게 나타남.</strong></p>
+
+    <p style="margin-top:10px;"><strong>1. TC0 open % 증가 &ne; 안정성 증가</strong></p>
+    <ul style="padding-left: 20px; color: var(--text2);">
+      <li>TC0=1ms(10%) = <span style="color:var(--green)">100%</span>, TC0=2ms(20%) = <span style="color:var(--red)">0%</span>, TC0=3ms(30%) = <span style="color:var(--green)">100%</span></li>
+      <li>gate-states-value가 달라도 TC0 bit가 열려있는 시간의 절대값과 위상이 결정적</li>
+    </ul>
+
+    <p style="margin-top:10px;"><strong>2. 분산 배치가 집중 배치보다 유리</strong></p>
+    <ul style="padding-left: 20px; color: var(--text2);">
+      <li>1&times;4ms: burst 51.2%, stdev 1749&micro;s</li>
+      <li>2&times;2ms: burst 0.2%, stdev 181&micro;s &mdash; <span style="color:var(--green)">10배 개선!</span></li>
+      <li>5&times;1ms: burst 0.2%, stdev 162&micro;s &mdash; 거의 baseline</li>
+    </ul>
+
+    <p style="margin-top:10px;"><strong>3. Guard Band = 실질적 TC0 확장</strong></p>
+    <ul style="padding-left: 20px; color: var(--text2);">
+      <li>Guard band(0xFF)에서 TC0도 열리므로, Guard 시간이 TC0 effective time에 추가</li>
+      <li>Guard=6ms → effective TC0=10ms(100%) → baseline과 동일</li>
+    </ul>
+
+    <p style="margin-top:10px;"><strong>4. ROII 설계 권장</strong></p>
+    <ul style="padding-left: 20px; color: var(--text2);">
+      <li>LiDAR-Heavy 프로필(TC0=6ms+Guard=1ms=70%) 권장</li>
+      <li>TC0 슬롯을 2개 이상으로 분산 배치 (beat frequency 회피)</li>
+      <li>Guard band를 TC0 슬롯 직후에 배치하여 transition margin 확보</li>
+    </ul>
+  </div>
+</div>
+
+<!-- Multi-TC Design Guidelines -->
+<div class="card full" style="border-color: var(--green);">
+  <h2 style="color: var(--green);">Multi-TC TSN 설계 가이드라인</h2>
+  <div class="guideline-grid">
+    <div class="guideline-box do">
+      <h3 style="color: var(--green);">DO</h3>
+      <ul>
+        <li>TC0 슬롯을 2개 이상으로 분산 배치 (jitter 10배 감소)</li>
+        <li>Guard band(0xFF)를 TC0 직후에 배치 (effective TC0 증가)</li>
+        <li>LiDAR TC에 &ge; 60% effective open 할당</li>
+        <li>20ms 또는 100ms cycle 사용 (beat frequency 동기화)</li>
+        <li>LiDAR-Heavy 프로필 기본 채택 (TC0=6ms+Guard=1ms)</li>
+      </ul>
+    </div>
+    <div class="guideline-box dont">
+      <h3 style="color: var(--red);">DON'T</h3>
+      <ul>
+        <li>TC0를 1개 연속 블록으로 할당 (burst 50%+)</li>
+        <li>beat frequency에 의존한 TC0 할당 (비결정적)</li>
+        <li>Guard band 없이 TC0 직후 다른 TC로 전환</li>
+        <li>Camera-Heavy 처럼 TC0 &lt; 30% 할당 (total loss 위험)</li>
+        <li>50ms cycle 사용 (close 25ms &rarr; 버퍼 위험)</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
 </div>
 
 <script>
@@ -1235,6 +1430,462 @@ buildTable('boundaryTable', boundaryData, [
     leg.append('circle').attr('cx',0).attr('cy',i*18).attr('r',5).attr('fill',d[0]);
     leg.append('text').attr('x',10).attr('y',i*18+4).attr('fill','#c8d6e5').attr('font-size','10px').text(d[1]);
   });
+})();
+
+// ══════════════════════════════════════════════════════════════
+// MULTI-TC TAS DATA (30 tests, 5 categories)
+// ══════════════════════════════════════════════════════════════
+
+const tc0SweepData = [
+  { label: "TC0=1ms (10%)", tc0_ms: 1, tc0_pct: 10, tc6_ms: 5, tc2_ms: 4, pkts: 12801, complete: 100, gapSD: 2565, p99: 9793, gapMax: 10119, burst: 79.5, normal: 0.0 },
+  { label: "TC0=2ms (20%)", tc0_ms: 2, tc0_pct: 20, tc6_ms: 4, tc2_ms: 4, pkts: 0, complete: 0, gapSD: 0, p99: 0, gapMax: 0, burst: 0, normal: 0 },
+  { label: "TC0=3ms (30%)", tc0_ms: 3, tc0_pct: 30, tc6_ms: 4, tc2_ms: 3, pkts: 12801, complete: 100, gapSD: 2023, p99: 7940, gapMax: 8350, burst: 63.9, normal: 20.7 },
+  { label: "TC0=4ms (40%)", tc0_ms: 4, tc0_pct: 40, tc6_ms: 3, tc2_ms: 3, pkts: 0, complete: 0, gapSD: 0, p99: 0, gapMax: 0, burst: 0, normal: 0 },
+  { label: "TC0=5ms (50%)", tc0_ms: 5, tc0_pct: 50, tc6_ms: 3, tc2_ms: 2, pkts: 12801, complete: 100, gapSD: 1450, p99: 5882, gapMax: 6246, burst: 45.0, normal: 41.2 },
+  { label: "TC0=6ms (60%)", tc0_ms: 6, tc0_pct: 60, tc6_ms: 2, tc2_ms: 2, pkts: 12801, complete: 100, gapSD: 175, p99: 1259, gapMax: 1750, burst: 0.2, normal: 90.8 },
+  { label: "TC0=7ms (70%)", tc0_ms: 7, tc0_pct: 70, tc6_ms: 2, tc2_ms: 1, pkts: 12801, complete: 100, gapSD: 892, p99: 3888, gapMax: 4370, burst: 22.8, normal: 57.9 },
+  { label: "TC0=8ms (80%)", tc0_ms: 8, tc0_pct: 80, tc6_ms: 1, tc2_ms: 1, pkts: 12801, complete: 100, gapSD: 159, p99: 1263, gapMax: 1789, burst: 0.1, normal: 92.2 },
+];
+
+const fragData = [
+  { label: "1\u00d74ms (contiguous)", windows: 1, winSize: 4.0, tc0_pct: 40, pkts: 12801, complete: 100, gapSD: 1749, p99: 7043, gapMax: 7762, burst: 51.2, normal: 28.2,
+    entries: [{g:'TC0',t:4,c:'#00e676'},{g:'TC6',t:6,c:'#ffd740'}] },
+  { label: "2\u00d72ms (split)", windows: 2, winSize: 2.0, tc0_pct: 40, pkts: 12801, complete: 100, gapSD: 181, p99: 1275, gapMax: 1794, burst: 0.2, normal: 89.9,
+    entries: [{g:'TC0',t:2,c:'#00e676'},{g:'TC6',t:3,c:'#ffd740'},{g:'TC0',t:2,c:'#00e676'},{g:'TC2',t:3,c:'#00d2ff'}] },
+  { label: "3\u00d71.3ms (fragmented)", windows: 3, winSize: 1.33, tc0_pct: 40, pkts: 12801, complete: 100, gapSD: 1032, p99: 2961, gapMax: 3305, burst: 45.5, normal: 18.8,
+    entries: [{g:'TC0',t:1.33,c:'#00e676'},{g:'TC6',t:2,c:'#ffd740'},{g:'TC0',t:1.33,c:'#00e676'},{g:'TC2',t:2,c:'#00d2ff'},{g:'TC0',t:1.34,c:'#00e676'},{g:'TC6',t:2,c:'#ffd740'}] },
+  { label: "5\u00d71ms (high freq)", windows: 5, winSize: 1.0, tc0_pct: 40, pkts: 12801, complete: 100, gapSD: 162, p99: 1263, gapMax: 1801, burst: 0.2, normal: 91.7,
+    entries: [{g:'TC0',t:1,c:'#00e676'},{g:'TC6',t:1,c:'#ffd740'},{g:'TC0',t:1,c:'#00e676'},{g:'TC6',t:1,c:'#ffd740'},{g:'TC0',t:1,c:'#00e676'},{g:'TC6',t:1,c:'#ffd740'},{g:'TC0',t:1,c:'#00e676'},{g:'TC6',t:3,c:'#ffd740'}] },
+  { label: "4\u00d70.5ms (ultra-fast)", windows: 4, winSize: 0.5, tc0_pct: 20, pkts: 12800, complete: 100, gapSD: 1844, p99: 7120, gapMax: 7811, burst: 56.8, normal: 22.8,
+    entries: [{g:'TC0',t:0.5,c:'#00e676'},{g:'TC6',t:0.5,c:'#ffd740'},{g:'TC0',t:0.5,c:'#00e676'},{g:'TC6',t:0.5,c:'#ffd740'},{g:'TC0',t:0.5,c:'#00e676'},{g:'TC6',t:0.5,c:'#ffd740'},{g:'TC0',t:0.5,c:'#00e676'},{g:'TC6',t:6.5,c:'#ffd740'}] },
+  { label: "1\u00d72ms (half baseline)", windows: 1, winSize: 2.0, tc0_pct: 20, pkts: 0, complete: 0, gapSD: 0, p99: 0, gapMax: 0, burst: 0, normal: 0,
+    entries: [{g:'TC0',t:2,c:'#00e676'},{g:'TC6',t:8,c:'#ffd740'}] },
+];
+
+const cycleScaleData = [
+  { label: "2ms", cycle_ms: 2, tc0_ms: 0.8, tc6_ms: 0.6, tc2_ms: 0.4, guard_ms: 0.2, pkts: 12800, complete: 100, gapSD: 685, p99: 2035, gapMax: 2769, burst: 24.6, normal: 18.4 },
+  { label: "5ms", cycle_ms: 5, tc0_ms: 2, tc6_ms: 1.5, tc2_ms: 1, guard_ms: 0.5, pkts: 12801, complete: 100, gapSD: 1039, p99: 3452, gapMax: 4069, burst: 34.1, normal: 32.2 },
+  { label: "10ms", cycle_ms: 10, tc0_ms: 4, tc6_ms: 3, tc2_ms: 2, guard_ms: 1, pkts: 12801, complete: 100, gapSD: 1452, p99: 5907, gapMax: 6341, burst: 43.7, normal: 40.6 },
+  { label: "20ms", cycle_ms: 20, tc0_ms: 8, tc6_ms: 6, tc2_ms: 4, guard_ms: 2, pkts: 12800, complete: 100, gapSD: 160, p99: 1254, gapMax: 1732, burst: 0.1, normal: 92.3 },
+  { label: "50ms", cycle_ms: 50, tc0_ms: 20, tc6_ms: 15, tc2_ms: 10, guard_ms: 5, pkts: 10347, complete: 100, gapSD: 3515, p99: 25822, gapMax: 26523, burst: 33.7, normal: 54.9 },
+  { label: "100ms", cycle_ms: 100, tc0_ms: 40, tc6_ms: 30, tc2_ms: 20, guard_ms: 10, pkts: 12801, complete: 100, gapSD: 175, p99: 1268, gapMax: 1923, burst: 0.3, normal: 90.6 },
+];
+
+const roiiData = [
+  { label: "ROII-Standard", tc0: 4.0, tc6: 2.5, tc5: 1.5, tc2: 1.0, guard: 1.0, effTc0: 50, pkts: 12801, complete: 100, gapSD: 1451, p99: 5890, gapMax: 7001, burst: 44.6, normal: 39.9 },
+  { label: "LiDAR-Heavy", tc0: 6.0, tc6: 1.5, tc5: 1.0, tc2: 0.5, guard: 1.0, effTc0: 70, pkts: 12801, complete: 100, gapSD: 186, p99: 1292, gapMax: 2103, burst: 0.3, normal: 89.0 },
+  { label: "Radar-Heavy", tc0: 2.0, tc6: 5.0, tc5: 1.0, tc2: 1.0, guard: 1.0, effTc0: 30, pkts: 12801, complete: 100, gapSD: 2005, p99: 7865, gapMax: 8271, burst: 63.1, normal: 21.5 },
+  { label: "Camera-Heavy", tc0: 2.0, tc6: 1.0, tc5: 5.0, tc2: 1.0, guard: 1.0, effTc0: 30, pkts: 0, complete: 0, gapSD: 0, p99: 0, gapMax: 0, burst: 0, normal: 0 },
+  { label: "Equal-Share", tc0: 2.0, tc6: 2.0, tc5: 2.0, tc2: 2.0, guard: 2.0, effTc0: 40, pkts: 12801, complete: 100, gapSD: 1739, p99: 6924, gapMax: 7350, burst: 52.4, normal: 30.4 },
+];
+
+const guardData = [
+  { label: "Guard=0ms", guard_ms: 0, tc6_ms: 6, effTc0: 4, effPct: 40, pkts: 12800, complete: 100, gapSD: 159, p99: 1255, gapMax: 1748, burst: 0.2, normal: 92.3 },
+  { label: "Guard=1ms", guard_ms: 1, tc6_ms: 5, effTc0: 5, effPct: 50, pkts: 12801, complete: 100, gapSD: 1452, p99: 5894, gapMax: 6699, burst: 44.8, normal: 41.3 },
+  { label: "Guard=2ms", guard_ms: 2, tc6_ms: 4, effTc0: 6, effPct: 60, pkts: 0, complete: 0, gapSD: 0, p99: 0, gapMax: 0, burst: 0, normal: 0 },
+  { label: "Guard=3ms", guard_ms: 3, tc6_ms: 3, effTc0: 7, effPct: 70, pkts: 12801, complete: 100, gapSD: 882, p99: 3865, gapMax: 4220, burst: 22.3, normal: 58.6 },
+  { label: "Guard=6ms", guard_ms: 6, tc6_ms: 0, effTc0: 10, effPct: 100, pkts: 12800, complete: 100, gapSD: 172, p99: 1268, gapMax: 2002, burst: 0.2, normal: 90.9 },
+];
+
+// ── Cat A: TC0 Allocation Sweep ──
+
+buildTable('tc0SweepTable', tc0SweepData, [
+  { header: 'Config', fn: d => d.label },
+  { header: 'TC0', fn: d => d.tc0_ms + 'ms' },
+  { header: 'TC6', fn: d => d.tc6_ms + 'ms' },
+  { header: 'TC2', fn: d => d.tc2_ms + 'ms' },
+  { header: 'TC0%', fn: d => d.tc0_pct + '%' },
+  { header: 'Cmpl%', fn: d => d.complete + '%', loss: true },
+  { header: 'Gap SD', fn: d => d.gapSD ? d.gapSD + '\u00b5s' : '\u2014' },
+  { header: 'P99', fn: d => d.p99 ? d.p99 + '\u00b5s' : '\u2014' },
+  { header: 'Burst%', fn: d => d.burst + '%' },
+]);
+
+// TC0 Sweep dual chart: Completeness + GapSD
+(function() {
+  const svg = d3.select('#chartTc0Sweep');
+  const bbox = svg.node().getBoundingClientRect();
+  const margin = { top: 30, right: 80, bottom: 50, left: 70 };
+  const w = bbox.width - margin.left - margin.right;
+  const h = 350 - margin.top - margin.bottom;
+  const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+  // Gantt-style per-TC visualization at top
+  const ganttH = 50;
+  const mainH = h - ganttH - 20;
+
+  // Draw one sample Gantt for 10ms cycle
+  const gx = d3.scaleLinear().domain([0, 10]).range([0, w]);
+  const tcColors = {'TC0': '#00e676', 'TC6': '#ffd740', 'TC2': '#00d2ff'};
+
+  tc0SweepData.forEach((d, i) => {
+    if (i > 3) return; // Show first 4 for space
+    const yPos = i * 12;
+    let offset = 0;
+    [{t: d.tc0_ms, tc:'TC0'}, {t: d.tc6_ms, tc:'TC6'}, {t: d.tc2_ms, tc:'TC2'}].forEach(e => {
+      g.append('rect').attr('x', gx(offset)).attr('y', yPos)
+        .attr('width', gx(e.t)).attr('height', 10)
+        .attr('fill', tcColors[e.tc]).attr('opacity', 0.6).attr('rx', 2);
+      offset += e.t;
+    });
+    g.append('text').attr('x', -5).attr('y', yPos + 8)
+      .attr('text-anchor', 'end').attr('fill', '#8899aa').attr('font-size', '8px')
+      .text(d.tc0_pct + '%');
+  });
+
+  // Main bar chart below
+  const gy = ganttH + 10;
+  const x = d3.scaleBand().domain(tc0SweepData.map(d => d.label)).range([0, w]).padding(0.2);
+  const ySD = d3.scaleLinear().domain([0, 3000]).range([mainH, 0]);
+
+  g.selectAll('.grid-line-tc0').data(ySD.ticks(5)).enter()
+    .append('line').attr('class','grid-line').attr('x1',0).attr('x2',w)
+    .attr('y1',d=>ySD(d)+gy).attr('y2',d=>ySD(d)+gy);
+
+  tc0SweepData.forEach(d => {
+    const barColor = d.complete === 0 ? '#ff5252' : d.gapSD < 300 ? '#00e676' : d.gapSD < 1500 ? '#ffab40' : '#ff5252';
+    const val = d.complete === 0 ? 3000 : d.gapSD;
+
+    g.append('rect')
+      .attr('x', x(d.label)).attr('y', ySD(val) + gy)
+      .attr('width', x.bandwidth()).attr('height', mainH - ySD(val))
+      .attr('fill', barColor).attr('rx', 3).attr('opacity', d.complete === 0 ? 0.4 : 0.85);
+
+    g.append('text')
+      .attr('x', x(d.label) + x.bandwidth()/2)
+      .attr('y', d.complete === 0 ? ySD(1500) + gy : ySD(val) + gy - 5)
+      .attr('text-anchor', 'middle').attr('fill', d.complete === 0 ? '#ff5252' : '#c8d6e5')
+      .attr('font-size', '10px')
+      .text(d.complete === 0 ? 'LOSS' : d.gapSD + '\u00b5s');
+  });
+
+  g.append('g').attr('class','axis').attr('transform',`translate(0,${mainH+gy})`)
+    .call(d3.axisBottom(x)).selectAll('text').attr('transform','rotate(-25)').style('text-anchor','end');
+  g.append('g').attr('class','axis').attr('transform',`translate(0,${gy})`)
+    .call(d3.axisLeft(ySD).ticks(5));
+  g.append('text').attr('transform','rotate(-90)').attr('x',-(mainH/2+gy)).attr('y',-55)
+    .attr('text-anchor','middle').attr('fill','#8899aa').attr('font-size','12px').text('Gap StdDev (\u00b5s)');
+})();
+
+
+// ── Cat B: Fragmentation Gantt ──
+
+(function() {
+  const svg = d3.select('#chartFragGantt');
+  const bbox = svg.node().getBoundingClientRect();
+  const margin = { top: 20, right: 80, bottom: 30, left: 200 };
+  const w = bbox.width - margin.left - margin.right;
+  const h = 300 - margin.top - margin.bottom;
+  const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+  const y = d3.scaleBand().domain(fragData.map(d=>d.label)).range([0, h]).padding(0.25);
+
+  fragData.forEach(d => {
+    const totalMs = d.entries.reduce((s,e) => s + e.t, 0);
+    const xScale = d3.scaleLinear().domain([0, totalMs]).range([0, w]);
+    let offset = 0;
+
+    d.entries.forEach(e => {
+      g.append('rect')
+        .attr('x', xScale(offset)).attr('y', y(d.label))
+        .attr('width', Math.max(1, xScale(e.t))).attr('height', y.bandwidth())
+        .attr('fill', e.c).attr('opacity', 0.7).attr('rx', 2);
+
+      if (xScale(e.t) > 25) {
+        g.append('text')
+          .attr('x', xScale(offset) + xScale(e.t)/2)
+          .attr('y', y(d.label) + y.bandwidth()/2 + 4)
+          .attr('text-anchor', 'middle').attr('fill', '#000').attr('font-size', '9px').attr('font-weight','bold')
+          .text(e.g + ' ' + e.t + 'ms');
+      }
+      offset += e.t;
+    });
+
+    // Status badge
+    const statusColor = d.complete > 0 ? '#00e676' : '#ff5252';
+    g.append('text').attr('x', w + 10).attr('y', y(d.label) + y.bandwidth()/2 + 4)
+      .attr('fill', statusColor).attr('font-size', '11px').attr('font-weight','bold')
+      .text(d.complete > 0 ? d.gapSD + '\u00b5s' : 'LOSS');
+  });
+
+  g.append('g').attr('class','axis').call(d3.axisLeft(y));
+
+  // Legend
+  const leg = g.append('g').attr('transform', `translate(0, ${h+5})`);
+  [{c:'#00e676',l:'TC0(LiDAR)'},{c:'#ffd740',l:'TC6(Radar)'},{c:'#00d2ff',l:'TC2(Control)'}].forEach((d,i) => {
+    leg.append('rect').attr('x',i*120).attr('y',0).attr('width',10).attr('height',10).attr('fill',d.c).attr('opacity',0.7);
+    leg.append('text').attr('x',i*120+14).attr('y',9).attr('fill','#c8d6e5').attr('font-size','10px').text(d.l);
+  });
+})();
+
+// Fragmentation table
+buildTable('fragTable', fragData, [
+  { header: 'Config', fn: d => d.label },
+  { header: 'Windows', fn: d => d.windows },
+  { header: 'TC0 Total', fn: d => (d.windows * d.winSize).toFixed(1) + 'ms' },
+  { header: 'TC0%', fn: d => d.tc0_pct + '%' },
+  { header: 'Cmpl%', fn: d => d.complete + '%', loss: true },
+  { header: 'Gap SD', fn: d => d.gapSD ? d.gapSD + '\u00b5s' : '\u2014' },
+  { header: 'Burst%', fn: d => d.burst + '%' },
+]);
+
+// Fragmentation comparison chart (GapSD + Burst)
+(function() {
+  const svg = d3.select('#chartFragCompare');
+  const bbox = svg.node().getBoundingClientRect();
+  const margin = { top: 30, right: 80, bottom: 60, left: 70 };
+  const w = bbox.width - margin.left - margin.right;
+  const h = 300 - margin.top - margin.bottom;
+  const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+  const validFrag = fragData.filter(d => d.complete > 0);
+  const x = d3.scaleBand().domain(validFrag.map(d=>d.label)).range([0, w]).padding(0.15);
+  const x1 = d3.scaleBand().domain(['gapSD','burst']).range([0, x.bandwidth()]).padding(0.1);
+  const ySD = d3.scaleLinear().domain([0, 2000]).range([h, 0]);
+  const yB = d3.scaleLinear().domain([0, 70]).range([h, 0]);
+
+  g.selectAll('.grid-line').data(ySD.ticks(5)).enter()
+    .append('line').attr('class','grid-line').attr('x1',0).attr('x2',w).attr('y1',d=>ySD(d)).attr('y2',d=>ySD(d));
+
+  validFrag.forEach(d => {
+    // GapSD bar
+    g.append('rect')
+      .attr('x', x(d.label) + x1('gapSD')).attr('y', ySD(d.gapSD))
+      .attr('width', x1.bandwidth()).attr('height', h - ySD(d.gapSD))
+      .attr('fill', '#00d2ff').attr('opacity', 0.8).attr('rx', 2);
+    g.append('text')
+      .attr('x', x(d.label) + x1('gapSD') + x1.bandwidth()/2)
+      .attr('y', ySD(d.gapSD) - 4)
+      .attr('text-anchor','middle').attr('fill','#c8d6e5').attr('font-size','9px')
+      .text(d.gapSD);
+
+    // Burst bar
+    const burstH = d.burst / 70 * h;
+    g.append('rect')
+      .attr('x', x(d.label) + x1('burst')).attr('y', h - burstH)
+      .attr('width', x1.bandwidth()).attr('height', burstH)
+      .attr('fill', '#ff5252').attr('opacity', 0.7).attr('rx', 2);
+    g.append('text')
+      .attr('x', x(d.label) + x1('burst') + x1.bandwidth()/2)
+      .attr('y', h - burstH - 4)
+      .attr('text-anchor','middle').attr('fill','#c8d6e5').attr('font-size','9px')
+      .text(d.burst + '%');
+  });
+
+  g.append('g').attr('class','axis').attr('transform',`translate(0,${h})`)
+    .call(d3.axisBottom(x)).selectAll('text').attr('transform','rotate(-25)').style('text-anchor','end');
+  g.append('g').attr('class','axis').call(d3.axisLeft(ySD).ticks(5));
+  g.append('text').attr('transform','rotate(-90)').attr('x',-h/2).attr('y',-55)
+    .attr('text-anchor','middle').attr('fill','#8899aa').attr('font-size','12px').text('Gap StdDev (\u00b5s)');
+
+  // Legend
+  const leg = g.append('g').attr('transform', `translate(${w-200}, -15)`);
+  leg.append('rect').attr('x',0).attr('y',0).attr('width',10).attr('height',10).attr('fill','#00d2ff').attr('opacity',0.8);
+  leg.append('text').attr('x',14).attr('y',9).attr('fill','#c8d6e5').attr('font-size','10px').text('Gap StdDev');
+  leg.append('rect').attr('x',100).attr('y',0).attr('width',10).attr('height',10).attr('fill','#ff5252').attr('opacity',0.7);
+  leg.append('text').attr('x',114).attr('y',9).attr('fill','#c8d6e5').attr('font-size','10px').text('Burst %');
+})();
+
+
+// ── Cat C: Cycle Scaling ──
+
+buildTable('cycleScaleTable', cycleScaleData, [
+  { header: 'Cycle', fn: d => d.cycle_ms + 'ms' },
+  { header: 'TC0', fn: d => d.tc0_ms + 'ms' },
+  { header: 'TC6', fn: d => d.tc6_ms + 'ms' },
+  { header: 'TC2', fn: d => d.tc2_ms + 'ms' },
+  { header: 'Guard', fn: d => d.guard_ms + 'ms' },
+  { header: 'Cmpl%', fn: d => d.complete + '%', loss: true },
+  { header: 'Gap SD', fn: d => d.gapSD + '\u00b5s' },
+  { header: 'Burst%', fn: d => d.burst + '%' },
+]);
+
+// Cycle scaling chart
+(function() {
+  const svg = d3.select('#chartCycleScale');
+  const bbox = svg.node().getBoundingClientRect();
+  const margin = { top: 30, right: 30, bottom: 50, left: 70 };
+  const w = bbox.width - margin.left - margin.right;
+  const h = 300 - margin.top - margin.bottom;
+  const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+  const x = d3.scaleBand().domain(cycleScaleData.map(d=>d.label)).range([0, w]).padding(0.2);
+  const y = d3.scaleLinear().domain([0, 4000]).range([h, 0]);
+
+  g.selectAll('.grid-line').data(y.ticks(5)).enter()
+    .append('line').attr('class','grid-line').attr('x1',0).attr('x2',w).attr('y1',d=>y(d)).attr('y2',d=>y(d));
+
+  // Stacked bars: TC0 time (green) + other TC time (gray)
+  cycleScaleData.forEach(d => {
+    const barColor = d.gapSD < 300 ? '#00e676' : d.gapSD < 1500 ? '#ffab40' : '#ff5252';
+    g.append('rect')
+      .attr('x', x(d.label)).attr('y', y(d.gapSD))
+      .attr('width', x.bandwidth()).attr('height', h - y(d.gapSD))
+      .attr('fill', barColor).attr('rx', 3).attr('opacity', 0.85);
+
+    g.append('text')
+      .attr('x', x(d.label) + x.bandwidth()/2)
+      .attr('y', y(d.gapSD) - 5)
+      .attr('text-anchor', 'middle').attr('fill', '#c8d6e5').attr('font-size', '10px')
+      .text(d.gapSD);
+
+    // TC0 time label under bar
+    g.append('text')
+      .attr('x', x(d.label) + x.bandwidth()/2)
+      .attr('y', h + 35)
+      .attr('text-anchor', 'middle').attr('fill', '#00e676').attr('font-size', '9px')
+      .text('TC0=' + d.tc0_ms + 'ms');
+  });
+
+  g.append('g').attr('class','axis').attr('transform',`translate(0,${h})`)
+    .call(d3.axisBottom(x));
+  g.append('g').attr('class','axis').call(d3.axisLeft(y).ticks(5));
+  g.append('text').attr('transform','rotate(-90)').attr('x',-h/2).attr('y',-55)
+    .attr('text-anchor','middle').attr('fill','#8899aa').attr('font-size','12px').text('Gap StdDev (\u00b5s)');
+
+  // Title
+  g.append('text').attr('x', w/2).attr('y', -10)
+    .attr('text-anchor','middle').attr('fill','#8899aa').attr('font-size','11px')
+    .text('ROII Ratio Fixed: TC0=40%, TC6=30%, TC2=20%, Guard=10%');
+})();
+
+
+// ── Cat D: ROII Profiles ──
+
+buildTable('roiiTable', roiiData, [
+  { header: 'Profile', fn: d => d.label },
+  { header: 'TC0', fn: d => d.tc0 + 'ms' },
+  { header: 'TC6', fn: d => d.tc6 + 'ms' },
+  { header: 'TC5', fn: d => d.tc5 + 'ms' },
+  { header: 'TC2', fn: d => d.tc2 + 'ms' },
+  { header: 'Guard', fn: d => d.guard + 'ms' },
+  { header: 'Eff TC0%', fn: d => d.effTc0 + '%' },
+  { header: 'Cmpl%', fn: d => d.complete + '%', loss: true },
+  { header: 'Gap SD', fn: d => d.gapSD ? d.gapSD + '\u00b5s' : '\u2014' },
+  { header: 'Burst%', fn: d => d.burst + '%' },
+]);
+
+// ROII Gantt
+(function() {
+  const svg = d3.select('#chartRoiiGantt');
+  const bbox = svg.node().getBoundingClientRect();
+  const margin = { top: 20, right: 80, bottom: 30, left: 160 };
+  const w = bbox.width - margin.left - margin.right;
+  const h = 300 - margin.top - margin.bottom;
+  const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+  const y = d3.scaleBand().domain(roiiData.map(d=>d.label)).range([0, h]).padding(0.25);
+  const xScale = d3.scaleLinear().domain([0, 10]).range([0, w]);
+  const tcColors = {'TC0': '#00e676', 'TC6': '#ffd740', 'TC5': '#7c5cfc', 'TC2': '#00d2ff', 'Guard': '#666'};
+
+  roiiData.forEach(d => {
+    let offset = 0;
+    [{tc:'TC0',t:d.tc0},{tc:'TC6',t:d.tc6},{tc:'TC5',t:d.tc5},{tc:'TC2',t:d.tc2},{tc:'Guard',t:d.guard}].forEach(e => {
+      g.append('rect')
+        .attr('x', xScale(offset)).attr('y', y(d.label))
+        .attr('width', xScale(e.t)).attr('height', y.bandwidth())
+        .attr('fill', tcColors[e.tc]).attr('opacity', 0.7).attr('rx', 2);
+
+      if (xScale(e.t) > 30) {
+        g.append('text')
+          .attr('x', xScale(offset) + xScale(e.t)/2)
+          .attr('y', y(d.label) + y.bandwidth()/2 + 4)
+          .attr('text-anchor','middle').attr('fill','#000').attr('font-size','9px').attr('font-weight','bold')
+          .text(e.tc + ' ' + e.t);
+      }
+      offset += e.t;
+    });
+
+    // Status
+    const sc = d.complete > 0 ? '#00e676' : '#ff5252';
+    g.append('text').attr('x', w + 10).attr('y', y(d.label) + y.bandwidth()/2 + 4)
+      .attr('fill', sc).attr('font-size','11px').attr('font-weight','bold')
+      .text(d.complete > 0 ? d.complete + '%' : 'LOSS');
+  });
+
+  g.append('g').attr('class','axis').call(d3.axisLeft(y));
+
+  // Time axis
+  g.append('g').attr('class','axis').attr('transform',`translate(0,${h})`)
+    .call(d3.axisBottom(xScale).ticks(10).tickFormat(d => d + 'ms'));
+
+  // Legend
+  const leg = g.append('g').attr('transform', `translate(0, ${h+5})`);
+  Object.entries(tcColors).forEach(([tc,c], i) => {
+    leg.append('rect').attr('x',i*90).attr('y',0).attr('width',10).attr('height',10).attr('fill',c).attr('opacity',0.7);
+    leg.append('text').attr('x',i*90+14).attr('y',9).attr('fill','#c8d6e5').attr('font-size','10px').text(tc);
+  });
+})();
+
+// ROII comparison chart
+barChart('chartRoiiCompare', roiiData.filter(d=>d.complete>0), 'gapSD', 'Gap StdDev (\u00b5s)',
+  v => v.toFixed(0), d => d.gapSD < 300 ? '#00e676' : d.gapSD < 1500 ? '#ffab40' : '#ff5252');
+
+
+// ── Cat E: Guard Band ──
+
+buildTable('guardTable', guardData, [
+  { header: 'Config', fn: d => d.label },
+  { header: 'TC0', fn: d => '4ms' },
+  { header: 'Guard', fn: d => d.guard_ms + 'ms' },
+  { header: 'TC6', fn: d => d.tc6_ms + 'ms' },
+  { header: 'Eff TC0', fn: d => d.effTc0 + 'ms' },
+  { header: 'Eff TC0%', fn: d => d.effPct + '%' },
+  { header: 'Cmpl%', fn: d => d.complete + '%', loss: true },
+  { header: 'Gap SD', fn: d => d.gapSD ? d.gapSD + '\u00b5s' : '\u2014' },
+  { header: 'Burst%', fn: d => d.burst + '%' },
+]);
+
+// Guard band chart
+(function() {
+  const svg = d3.select('#chartGuard');
+  const bbox = svg.node().getBoundingClientRect();
+  const margin = { top: 30, right: 30, bottom: 50, left: 70 };
+  const w = bbox.width - margin.left - margin.right;
+  const h = 300 - margin.top - margin.bottom;
+  const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+  const x = d3.scaleBand().domain(guardData.map(d=>d.label)).range([0, w]).padding(0.2);
+  const y = d3.scaleLinear().domain([0, 2000]).range([h, 0]);
+
+  g.selectAll('.grid-line').data(y.ticks(5)).enter()
+    .append('line').attr('class','grid-line').attr('x1',0).attr('x2',w).attr('y1',d=>y(d)).attr('y2',d=>y(d));
+
+  guardData.forEach(d => {
+    const barColor = d.complete === 0 ? '#ff5252' : d.gapSD < 300 ? '#00e676' : d.gapSD < 1000 ? '#ffab40' : '#ff5252';
+    const val = d.complete === 0 ? 2000 : d.gapSD;
+
+    g.append('rect')
+      .attr('x', x(d.label)).attr('y', y(val))
+      .attr('width', x.bandwidth()).attr('height', h - y(val))
+      .attr('fill', barColor).attr('rx', 3).attr('opacity', d.complete === 0 ? 0.4 : 0.85);
+
+    g.append('text')
+      .attr('x', x(d.label) + x.bandwidth()/2)
+      .attr('y', d.complete === 0 ? y(1000) : y(val) - 5)
+      .attr('text-anchor','middle').attr('fill', d.complete === 0 ? '#ff5252' : '#c8d6e5')
+      .attr('font-size','10px')
+      .text(d.complete === 0 ? 'LOSS' : d.gapSD + '\u00b5s');
+
+    // Effective TC0 label
+    g.append('text')
+      .attr('x', x(d.label) + x.bandwidth()/2)
+      .attr('y', h + 35)
+      .attr('text-anchor','middle').attr('fill','#00e676').attr('font-size','9px')
+      .text('eff=' + d.effTc0 + 'ms');
+  });
+
+  g.append('g').attr('class','axis').attr('transform',`translate(0,${h})`)
+    .call(d3.axisBottom(x));
+  g.append('g').attr('class','axis').call(d3.axisLeft(y).ticks(5));
+  g.append('text').attr('transform','rotate(-90)').attr('x',-h/2).attr('y',-55)
+    .attr('text-anchor','middle').attr('fill','#8899aa').attr('font-size','12px').text('Gap StdDev (\u00b5s)');
+
+  g.append('text').attr('x', w/2).attr('y', -10)
+    .attr('text-anchor','middle').attr('fill','#8899aa').attr('font-size','11px')
+    .text('TC0=4ms fixed + Guard(0xFF) varies');
+})();
+
 })();
 
 </script>
