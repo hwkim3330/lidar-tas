@@ -1,0 +1,17 @@
+# Disable TAS and force all gates open
+- ? "/ietf-interfaces:interfaces/interface[name='1']/ieee802-dot1q-bridge:bridge-port/ieee802-dot1q-sched-bridge:gate-parameter-table"
+  : gate-enabled: true
+    admin-gate-states: 255
+    admin-cycle-time:
+      numerator: 1000000
+      denominator: 1000000000
+    admin-base-time:
+      seconds: 0
+      nanoseconds: 0
+    admin-control-list:
+      gate-control-entry:
+        - index: 0
+          operation-name: set-gate-states
+          gate-states-value: 255
+          time-interval-value: 1000000
+    config-change: true
