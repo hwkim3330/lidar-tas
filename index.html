@@ -138,7 +138,7 @@ svg { width: 100%; overflow: visible; }
 }
 .finding {
   flex: 1;
-  min-width: 200px;
+  min-width: 150px;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -159,6 +159,7 @@ svg { width: 100%; overflow: visible; }
 .finding.red .value { color: var(--red); }
 .finding.orange .value { color: var(--orange); }
 .finding.blue .value { color: var(--accent); }
+.finding.purple .value { color: var(--accent2); }
 
 .note {
   background: rgba(0,210,255,0.08);
@@ -167,6 +168,64 @@ svg { width: 100%; overflow: visible; }
   margin-top: 15px;
   font-size: 0.85em;
   border-radius: 0 6px 6px 0;
+}
+
+/* Section divider */
+.section-divider {
+  text-align: center;
+  margin: 50px 0 30px;
+  padding: 15px;
+  border-top: 2px solid var(--border);
+  border-bottom: 2px solid var(--border);
+}
+.section-divider h1 {
+  margin: 0;
+  font-size: 1.6em;
+}
+.section-divider .sub {
+  color: var(--text2);
+  font-size: 0.9em;
+  margin-top: 5px;
+}
+
+/* Heatmap */
+.heatmap-cell {
+  stroke: var(--bg);
+  stroke-width: 2;
+}
+
+/* Gate Gantt */
+.gate-gantt { margin: 10px 0; }
+.gate-gantt .open { fill: var(--green); opacity: 0.7; }
+.gate-gantt .close { fill: var(--red); opacity: 0.5; }
+
+/* Guidelines */
+.guideline-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-top: 15px;
+}
+.guideline-box {
+  padding: 15px;
+  border-radius: 8px;
+  font-size: 0.85em;
+}
+.guideline-box.do {
+  background: rgba(0,230,118,0.08);
+  border: 1px solid rgba(0,230,118,0.3);
+}
+.guideline-box.dont {
+  background: rgba(255,82,82,0.08);
+  border: 1px solid rgba(255,82,82,0.3);
+}
+.guideline-box h3 {
+  margin-bottom: 10px;
+  font-size: 1em;
+}
+.guideline-box ul {
+  padding-left: 18px;
+  line-height: 1.8;
 }
 </style>
 </head>
@@ -204,12 +263,12 @@ svg { width: 100%; overflow: visible; }
       <div><strong>Ouster OS-1-16</strong></div>
       <div class="setup-label">192.168.6.11<br>UDP 7502<br>10Hz / 128 pkts/frame</div>
     </div>
-    <div class="setup-arrow">→ Ethernet →</div>
+    <div class="setup-arrow">&rarr; Ethernet &rarr;</div>
     <div class="setup-box switch">
       <div><strong>LAN9662</strong></div>
       <div class="setup-label">Port 2 (ingress)<br>802.1Qbv TAS<br>Port 1 (egress)</div>
     </div>
-    <div class="setup-arrow">→ Ethernet →</div>
+    <div class="setup-arrow">&rarr; Ethernet &rarr;</div>
     <div class="setup-box pc">
       <div><strong>PC</strong></div>
       <div class="setup-label">192.168.6.1<br>USB Ethernet<br>Python UDP socket</div>
@@ -227,13 +286,13 @@ svg { width: 100%; overflow: visible; }
     <h2>LiDAR 스펙</h2>
     <table class="spec-table">
       <tr><td>모델</td><td>Ouster OS-1-16-A0</td></tr>
-      <tr><td>해상도</td><td>2048 × 16</td></tr>
+      <tr><td>해상도</td><td>2048 &times; 16</td></tr>
       <tr><td>회전 속도</td><td>10 Hz</td></tr>
       <tr><td>패킷/프레임</td><td>128 (16 cols/pkt)</td></tr>
       <tr><td>패킷 크기</td><td>3,328 bytes</td></tr>
-      <tr><td>패킷 간격</td><td>~781 µs</td></tr>
+      <tr><td>패킷 간격</td><td>~781 &micro;s</td></tr>
       <tr><td>데이터 레이트</td><td>~34 Mbps</td></tr>
-      <tr><td>전송 시간/pkt</td><td>~26.6 µs @1Gbps</td></tr>
+      <tr><td>전송 시간/pkt</td><td>~26.6 &micro;s @1Gbps</td></tr>
     </table>
   </div>
 
@@ -243,7 +302,7 @@ svg { width: 100%; overflow: visible; }
     <table class="spec-table">
       <tr><td>모델</td><td>Microchip LAN9662</td></tr>
       <tr><td>펌웨어</td><td>VelocitySP v2025.06</td></tr>
-      <tr><td>포트</td><td>2× 1Gbps</td></tr>
+      <tr><td>포트</td><td>2&times; 1Gbps</td></tr>
       <tr><td>TAS 표준</td><td>IEEE 802.1Qbv</td></tr>
       <tr><td>최대 GCL 항목</td><td>8</td></tr>
       <tr><td>트래픽 클래스</td><td>8 (TC0~TC7)</td></tr>
@@ -297,19 +356,19 @@ svg { width: 100%; overflow: visible; }
     <strong>스위치 내부 버퍼 크기가 병목</strong>. LAN9662의 TC0 큐 버퍼가 ~30~40 패킷 수준으로 추정.</p>
 
     <p style="margin-top:10px;"><strong>3. Burst 패턴</strong><br>
-    Close 구간이 길수록 burst 비율 증가: 0.1% (baseline) → 68.9% (5ms/20%).
-    Burst 패킷은 < 50µs 간격으로 연속 도착하며, 이는 line rate 전송을 의미.
+    Close 구간이 길수록 burst 비율 증가: 0.1% (baseline) &rarr; 68.9% (5ms/20%).
+    Burst 패킷은 &lt; 50&micro;s 간격으로 연속 도착하며, 이는 line rate 전송을 의미.
     수신측 어플리케이션의 버퍼 설계 시 고려 필요.</p>
 
     <p style="margin-top:10px;"><strong>4. 특이 패턴: Cycle-LiDAR 동기화</strong><br>
-    일부 설정에서 예상보다 낮은 jitter 관찰 (예: 10ms/20% = 158µs, 50ms/50% = 171µs).
-    이는 TAS cycle과 LiDAR 패킷 간격(781µs)이 정수배 관계에 가까울 때 발생하는
+    일부 설정에서 예상보다 낮은 jitter 관찰 (예: 10ms/20% = 158&micro;s, 50ms/50% = 171&micro;s).
+    이는 TAS cycle과 LiDAR 패킷 간격(781&micro;s)이 정수배 관계에 가까울 때 발생하는
     <strong>beat frequency 동기화</strong> 효과로, 대부분의 gate-open 구간에 패킷이 정확히 맞아떨어짐.</p>
 
     <p style="margin-top:10px;"><strong>5. 실무 시사점</strong><br>
-    LiDAR + TSN 환경에서 TAS를 적용할 때, LiDAR 트래픽 클래스에 충분한 open 비율(≥50%)을
+    LiDAR + TSN 환경에서 TAS를 적용할 때, LiDAR 트래픽 클래스에 충분한 open 비율(&ge;50%)을
     할당하면 패킷 손실 없이 다른 TC의 deterministic 전송을 보장할 수 있음.
-    close 구간이 LiDAR 패킷 간격(~781µs) 대비 수십 배를 넘으면 버퍼 오버플로우 위험.</p>
+    close 구간이 LiDAR 패킷 간격(~781&micro;s) 대비 수십 배를 넘으면 버퍼 오버플로우 위험.</p>
   </div>
 </div>
 
@@ -317,7 +376,7 @@ svg { width: 100%; overflow: visible; }
 <div class="card full" style="border-color: var(--accent2);">
   <h2 style="color: var(--accent2);">Jitter 원인 진단</h2>
   <div class="note" style="border-left-color: var(--accent2); margin-bottom:15px;">
-    게이트가 전부 열려있는데도 stdev ~170µs 수준의 jitter가 관측됨. 원인을 파악하기 위해
+    게이트가 전부 열려있는데도 stdev ~170&micro;s 수준의 jitter가 관측됨. 원인을 파악하기 위해
     TAS cycle time을 1ms/10ms/100ms로 변경하면서 all-open 상태의 jitter를 비교 측정.
   </div>
 
@@ -326,22 +385,22 @@ svg { width: 100%; overflow: visible; }
   <div style="margin-top:20px;">
     <h3 style="font-size:0.95em; color: var(--accent2); margin-bottom:10px;">결론</h3>
     <div style="font-size:0.9em; line-height:1.8;">
-      <p><strong>TAS gate 전환은 원인이 아님.</strong> All-open 상태에서 cycle time을 1ms→10ms→100ms로 변경해도
-      jitter(stdev)가 167~182µs로 거의 동일. Gate 전환 주기와 무관한 일정한 jitter가 존재.</p>
+      <p><strong>TAS gate 전환은 원인이 아님.</strong> All-open 상태에서 cycle time을 1ms&rarr;10ms&rarr;100ms로 변경해도
+      jitter(stdev)가 167~182&micro;s로 거의 동일. Gate 전환 주기와 무관한 일정한 jitter가 존재.</p>
 
       <p style="margin-top:10px;"><strong>원인 분석:</strong></p>
       <ul style="padding-left: 20px; color: var(--text2);">
-        <li><strong>USB Ethernet 어댑터</strong>: URB (USB Request Block) 스케줄링 간격으로 인한 패킷 도착 시간 편차. USB 2.0/3.0 폴링 간격(125µs~1ms)이 패킷 타이밍에 영향</li>
-        <li><strong>스위치 Store-and-Forward</strong>: LAN9662는 cut-through가 아닌 store-and-forward 방식. 3,328B 패킷의 수신 완료 후 전달까지 ~26.6µs + 가변 큐잉 지연</li>
-        <li><strong>OS 스케줄링</strong>: Python socket.recvfrom() 호출 시 커널 → 유저스페이스 전환 지연</li>
+        <li><strong>USB Ethernet 어댑터</strong>: URB (USB Request Block) 스케줄링 간격으로 인한 패킷 도착 시간 편차. USB 2.0/3.0 폴링 간격(125&micro;s~1ms)이 패킷 타이밍에 영향</li>
+        <li><strong>스위치 Store-and-Forward</strong>: LAN9662는 cut-through가 아닌 store-and-forward 방식. 3,328B 패킷의 수신 완료 후 전달까지 ~26.6&micro;s + 가변 큐잉 지연</li>
+        <li><strong>OS 스케줄링</strong>: Python socket.recvfrom() 호출 시 커널 &rarr; 유저스페이스 전환 지연</li>
       </ul>
 
       <p style="margin-top:10px;"><strong>정량 분석 (All-Open 평균):</strong></p>
       <ul style="padding-left: 20px; color: var(--text2);">
-        <li>정상 범위(500~1200µs): <strong>~91%</strong> — 대부분 정상</li>
-        <li>P99 지연: <strong>~1270µs</strong> (예상 781µs 대비 +63%)</li>
-        <li>Burst (&lt;50µs): <strong>~0.2%</strong> — 프레임 경계 재동기화</li>
-        <li>Large gap (&gt;1200µs): <strong>~2.7%</strong> — OS/USB 스케줄링 지연</li>
+        <li>정상 범위(500~1200&micro;s): <strong>~91%</strong> &mdash; 대부분 정상</li>
+        <li>P99 지연: <strong>~1270&micro;s</strong> (예상 781&micro;s 대비 +63%)</li>
+        <li>Burst (&lt;50&micro;s): <strong>~0.2%</strong> &mdash; 프레임 경계 재동기화</li>
+        <li>Large gap (&gt;1200&micro;s): <strong>~2.7%</strong> &mdash; OS/USB 스케줄링 지연</li>
       </ul>
     </div>
   </div>
@@ -359,10 +418,179 @@ svg { width: 100%; overflow: visible; }
   <svg id="chartPerFrame" height="300"></svg>
 </div>
 
+<!-- ================================================================== -->
+<!-- COMPREHENSIVE TEST SUITE RESULTS -->
+<!-- ================================================================== -->
+
+<div class="section-divider">
+  <h1>종합 테스트 스위트</h1>
+  <div class="sub">6 categories &middot; 43 configs &middot; Sub-ms ~ 500ms cycle &middot; 2-4 GCL entries</div>
+</div>
+
+<!-- Comprehensive Summary Cards -->
+<div class="findings">
+  <div class="finding green">
+    <div class="value">43</div>
+    <div class="label">총 테스트 수<br>6개 카테고리</div>
+  </div>
+  <div class="finding green">
+    <div class="value">36/43</div>
+    <div class="label">패킷 수신 성공<br>(completeness &gt; 0)</div>
+  </div>
+  <div class="finding red">
+    <div class="value">7</div>
+    <div class="label">Total Loss<br>(0 packets)</div>
+  </div>
+  <div class="finding purple">
+    <div class="value">13 min</div>
+    <div class="label">총 측정 시간<br>(2026-02-24)</div>
+  </div>
+</div>
+
+<!-- Category 1: Sub-Millisecond -->
+<div class="card full" style="border-color: var(--green);">
+  <h2 style="color: var(--green);">Cat 1: Sub-Millisecond Gating</h2>
+  <div class="note" style="border-left-color: var(--green); margin-bottom:15px;">
+    LiDAR 패킷 간격(781&micro;s)보다 짧은 TAS cycle 테스트. 게이트가 패킷 사이사이에서 열고 닫히므로
+    개별 패킷 차단이 아닌 확률적 지연만 발생.
+    <strong>결과: 10/10 전부 100% 수신.</strong>
+  </div>
+  <table class="result-table" id="subMsTable"></table>
+  <svg id="chartSubMsJitter" height="280"></svg>
+</div>
+
+<!-- Category 2: Buffer Capacity -->
+<div class="card full" style="border-color: var(--orange);">
+  <h2 style="color: var(--orange);">Cat 2: Buffer Capacity Mapping</h2>
+  <div class="note" style="border-left-color: var(--orange); margin-bottom:15px;">
+    Close time을 점진적으로 늘려 버퍼 오버플로우 임계점을 탐색.
+    <strong>발견: close 20ms 이상에서 패킷 손실 시작, 비결정적 패턴 (동기화 효과).</strong>
+    25ms/35ms/45ms에서 total loss이나 20ms/30ms/40ms/50ms에서는 부분 수신 &mdash;
+    TAS cycle과 LiDAR 주기의 beat frequency에 따라 결과가 극단적으로 갈림.
+  </div>
+  <table class="result-table" id="bufferTable"></table>
+  <svg id="chartBufferThreshold" height="320"></svg>
+</div>
+
+<!-- Category 3: Frame-Aligned -->
+<div class="card full" style="border-color: var(--accent);">
+  <h2 style="color: var(--accent);">Cat 3: Frame-Aligned Gating (100ms = 1 Frame)</h2>
+  <div class="note" style="border-left-color: var(--accent); margin-bottom:15px;">
+    100ms cycle = LiDAR 1프레임(128 pkts) 정확히 동기. Close time이 40ms(~51 pkts)에 도달해도
+    동기화 효과로 패킷이 open 구간에 집중.
+    <strong>결과: 5/5 전부 100% 수신 (50% open까지!).</strong>
+  </div>
+  <table class="result-table" id="frameAlignedTable"></table>
+  <svg id="chartFrameAligned" height="280"></svg>
+</div>
+
+<!-- Category 4: Multi-GCL -->
+<div class="card full" style="border-color: var(--accent2);">
+  <h2 style="color: var(--accent2);">Cat 4: Multi-GCL Entries</h2>
+  <div class="note" style="border-left-color: var(--accent2); margin-bottom:15px;">
+    2개 이상의 Gate Control List 항목으로 복잡한 게이트 스케줄 구성.
+    <strong>결과: 짧은 open window(1ms)나 긴 close(20ms)가 포함되면 total loss 가능.</strong>
+  </div>
+  <table class="result-table" id="multiGclTable"></table>
+  <svg id="chartMultiGcl" height="250"></svg>
+</div>
+
+<!-- Category 5: Endurance -->
+<div class="card full" style="border-color: var(--yellow);">
+  <h2 style="color: var(--yellow);">Cat 5: Endurance (60초 측정)</h2>
+  <div class="note" style="border-left-color: var(--yellow); margin-bottom:15px;">
+    60초 장시간 측정으로 통계 신뢰도 확보. 10초 테스트에서 51.6%였던 50ms/20%가
+    60초에서는 <strong>0% (total loss)</strong> &mdash; 동기화 위상이 시간에 따라 변동하여
+    장시간에서는 지속적 수신 불가.
+  </div>
+  <table class="result-table" id="enduranceTable"></table>
+</div>
+
+<!-- Category 6: Boundary -->
+<div class="card full" style="border-color: var(--red);">
+  <h2 style="color: var(--red);">Cat 6: Boundary Conditions</h2>
+  <div class="note" style="border-left-color: var(--red); margin-bottom:15px;">
+    극한 파라미터: 1ms cycle에서 99%/98%/95%/90% open (close 10~100&micro;s),
+    200ms/80% (40ms close), 500ms/50% (250ms close).
+    <strong>결과: 500ms/50% 250ms close에서도 100% 수신 &mdash; 동기화 효과.</strong>
+  </div>
+  <table class="result-table" id="boundaryTable"></table>
+</div>
+
+<!-- Comprehensive Heatmap -->
+<div class="card full">
+  <h2>Completeness Heatmap: Close Time vs Cycle Time</h2>
+  <svg id="chartHeatmap" height="400"></svg>
+  <div class="note" style="margin-top:10px;">
+    Close time이 ~20ms를 초과하면 손실 위험 시작. 그러나 TAS cycle과 LiDAR 주기의
+    beat frequency 동기화에 따라 동일한 close time에서도 결과가 극단적으로 달라질 수 있음
+    (25ms/35ms/45ms = 0%, 30ms/40ms/50ms = 부분 수신).
+  </div>
+</div>
+
+<!-- Design Guidelines -->
+<div class="card full" style="border-color: var(--green);">
+  <h2 style="color: var(--green);">TSN 설계 가이드라인</h2>
+  <div class="guideline-grid">
+    <div class="guideline-box do">
+      <h3 style="color: var(--green);">DO</h3>
+      <ul>
+        <li>Close time &le; 10ms 유지 (안전 영역)</li>
+        <li>Sub-ms cycle 자유롭게 사용 가능 (100~781&micro;s 전부 100%)</li>
+        <li>LiDAR 프레임 주기(100ms)의 정수배 cycle 활용</li>
+        <li>Open &ge; 50% 할당 시 대부분의 설정에서 안전</li>
+        <li>Multi-GCL 사용 시 개별 open window &ge; 2ms 확보</li>
+        <li>Burst 수신 대비 RX 버퍼 16MB 이상 설정</li>
+      </ul>
+    </div>
+    <div class="guideline-box dont">
+      <h3 style="color: var(--red);">DON'T</h3>
+      <ul>
+        <li>Close time &ge; 20ms 사용 금지 (버퍼 오버플로우)</li>
+        <li>Multi-GCL에서 1ms 이하 open window 사용 금지 (total loss)</li>
+        <li>50ms/20% 등 장시간 close는 단기 테스트도 불안정</li>
+        <li>Beat frequency 동기화에 의존한 설계 금지 (비결정적)</li>
+        <li>단일 TC에 전체 close 할당 시 해당 TC 트래픽 완전 차단 위험</li>
+        <li>장시간 운영에서 10초 테스트 결과 외삽 금지</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Key Discovery -->
+<div class="card full" style="border-color: var(--accent2); background: rgba(124,92,252,0.05);">
+  <h2 style="color: var(--accent2);">핵심 발견: Beat Frequency 동기화</h2>
+  <div style="font-size:0.9em; line-height:1.8;">
+    <p>종합 테스트에서 가장 중요한 발견은 <strong>TAS cycle과 LiDAR 패킷 주기 간의 beat frequency 동기화</strong>입니다.</p>
+
+    <p style="margin-top:10px;"><strong>현상:</strong></p>
+    <ul style="padding-left: 20px; color: var(--text2);">
+      <li>동일한 open %(20%)에서 25ms = <span style="color:var(--red)">0%</span>, 30ms = <span style="color:var(--orange)">72%</span>,
+          35ms = <span style="color:var(--red)">0%</span>, 40ms = <span style="color:var(--orange)">58%</span> &mdash; 교대로 성공/실패</li>
+      <li>500ms/50% (250ms close)에서도 <span style="color:var(--green)">100%</span> 수신 &mdash; close 시간보다 동기화가 결정적</li>
+      <li>100ms cycle (= LiDAR frame period)에서 50%까지 <span style="color:var(--green)">100%</span> &mdash; 완벽 동기화</li>
+    </ul>
+
+    <p style="margin-top:10px;"><strong>원인:</strong></p>
+    <p style="color: var(--text2);">LiDAR는 자유 구동(free-running) 클럭으로 781&micro;s 간격 패킷을 전송.
+    TAS gate는 독립 클럭으로 동작. 두 주기의 최소공배수(LCM)에 따라 패킷이 gate-open 구간에
+    집중되거나 분산됨. 이 관계가 정수비에 가까우면 대부분의 패킷이 open 구간에 도착하여
+    close time이 길어도 손실이 발생하지 않음.</p>
+
+    <p style="margin-top:10px;"><strong>실무 의미:</strong></p>
+    <p style="color: var(--text2);">이 동기화 효과는 <strong>비결정적(non-deterministic)</strong>이므로 안전 설계에 의존해서는 안 됨.
+    환경 변화(온도, 클럭 드리프트)에 따라 동기화가 깨질 수 있으며, 장시간 운영 시
+    위상 관계가 변동하여 갑작스러운 패킷 손실 발생 가능. 10초 단기 테스트와 60초 장기 테스트의
+    결과 차이(50ms/20%: 51.6% vs 0%)가 이를 증명.</p>
+  </div>
+</div>
+
 </div>
 
 <script>
-// Data
+// ══════════════════════════════════════════════════════════════
+// ORIGINAL DATA (13-config sweep)
+// ══════════════════════════════════════════════════════════════
 const data = [
   { label: "Baseline", cycle: 0, open: 0, close: 0, openPct: 100, complete: 100, pps: 1280, gapMean: 781, gapSD: 159, gapMax: 1681, p99: 1200, burst: 0.1 },
   { label: "1ms/80%", cycle: 1000, open: 800, close: 200, openPct: 80, complete: 100, pps: 1280, gapMean: 781, gapSD: 240, gapMax: 1811, p99: 1321, burst: 0.6 },
@@ -379,7 +607,6 @@ const data = [
   { label: "50ms/20%", cycle: 50000, open: 10000, close: 40000, openPct: 20, complete: 51.6, pps: 660, gapMean: 1515, gapSD: 6922, gapMax: 41066, p99: 40669, burst: 55.1 },
 ];
 
-// Color scale by cycle time
 const cycleColors = { 0: '#8899aa', 1000: '#00d2ff', 5000: '#7c5cfc', 10000: '#00e676', 50000: '#ff5252' };
 function getColor(d) { return cycleColors[d.cycle] || '#ffffff'; }
 
@@ -392,38 +619,36 @@ const tbody = table.append('tbody');
 data.forEach(d => {
   const tr = tbody.append('tr').classed('baseline', d.cycle === 0);
   tr.append('td').text(d.label);
-  tr.append('td').text(d.cycle === 0 ? '—' : (d.cycle/1000)+'ms');
+  tr.append('td').text(d.cycle === 0 ? '\u2014' : (d.cycle/1000)+'ms');
   tr.append('td').text(d.openPct + '%');
   const cmplTd = tr.append('td').text(d.complete.toFixed(1) + '%');
   if (d.complete < 100) cmplTd.classed('loss', true);
   tr.append('td').text(d.pps.toFixed(0));
-  tr.append('td').text(d.gapMean.toFixed(0) + 'µs');
-  tr.append('td').text(d.gapSD.toFixed(0) + 'µs');
-  tr.append('td').text(d.p99.toFixed(0) + 'µs');
-  tr.append('td').text(d.gapMax.toFixed(0) + 'µs');
+  tr.append('td').text(d.gapMean.toFixed(0) + '\u00b5s');
+  tr.append('td').text(d.gapSD.toFixed(0) + '\u00b5s');
+  tr.append('td').text(d.p99.toFixed(0) + '\u00b5s');
+  tr.append('td').text(d.gapMax.toFixed(0) + '\u00b5s');
   tr.append('td').text(d.burst.toFixed(1) + '%');
 });
 
 // Generic bar chart
-function barChart(svgId, metric, yLabel, fmt, colorFn) {
+function barChart(svgId, dataset, metric, yLabel, fmt, colorFn) {
   const svg = d3.select('#' + svgId);
   const bbox = svg.node().getBoundingClientRect();
   const margin = { top: 20, right: 30, bottom: 60, left: 70 };
   const w = bbox.width - margin.left - margin.right;
-  const h = 300 - margin.top - margin.bottom;
+  const h = parseInt(svg.attr('height')) - margin.top - margin.bottom;
   const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
-  const x = d3.scaleBand().domain(data.map(d => d.label)).range([0, w]).padding(0.3);
-  const yMax = d3.max(data, d => d[metric]) * 1.15;
+  const x = d3.scaleBand().domain(dataset.map(d => d.label)).range([0, w]).padding(0.3);
+  const yMax = d3.max(dataset, d => d[metric]) * 1.15 || 1;
   const y = d3.scaleLinear().domain([0, yMax]).range([h, 0]);
 
-  // Grid
   g.selectAll('.grid-line').data(y.ticks(5)).enter()
     .append('line').attr('class', 'grid-line')
     .attr('x1', 0).attr('x2', w).attr('y1', d => y(d)).attr('y2', d => y(d));
 
-  // Bars
-  g.selectAll('rect').data(data).enter().append('rect')
+  g.selectAll('rect').data(dataset).enter().append('rect')
     .attr('x', d => x(d.label))
     .attr('y', d => y(d[metric]))
     .attr('width', x.bandwidth())
@@ -432,8 +657,7 @@ function barChart(svgId, metric, yLabel, fmt, colorFn) {
     .attr('rx', 3)
     .attr('opacity', 0.85);
 
-  // Value labels
-  g.selectAll('.val').data(data).enter().append('text')
+  g.selectAll('.val').data(dataset).enter().append('text')
     .attr('x', d => x(d.label) + x.bandwidth()/2)
     .attr('y', d => y(d[metric]) - 5)
     .attr('text-anchor', 'middle')
@@ -441,12 +665,10 @@ function barChart(svgId, metric, yLabel, fmt, colorFn) {
     .attr('font-size', '10px')
     .text(d => fmt ? fmt(d[metric]) : d[metric]);
 
-  // X axis
   g.append('g').attr('class', 'axis').attr('transform', `translate(0,${h})`)
     .call(d3.axisBottom(x))
     .selectAll('text').attr('transform', 'rotate(-35)').style('text-anchor', 'end');
 
-  // Y axis
   g.append('g').attr('class', 'axis').call(d3.axisLeft(y).ticks(5));
   g.append('text').attr('transform', 'rotate(-90)')
     .attr('x', -h/2).attr('y', -55)
@@ -454,13 +676,13 @@ function barChart(svgId, metric, yLabel, fmt, colorFn) {
     .text(yLabel);
 }
 
-// Render charts
-barChart('chartComplete', 'complete', 'Completeness (%)', v => v.toFixed(1)+'%',
+// Original charts
+barChart('chartComplete', data, 'complete', 'Completeness (%)', v => v.toFixed(1)+'%',
   d => d.complete < 100 ? '#ff5252' : getColor(d));
-barChart('chartJitter', 'gapSD', 'Jitter — Gap StdDev (µs)', v => v.toFixed(0));
-barChart('chartBurst', 'burst', 'Burst Rate (%)', v => v.toFixed(1)+'%');
-barChart('chartMaxGap', 'gapMax', 'Max Inter-Packet Gap (µs)', v =>
-  v >= 1000 ? (v/1000).toFixed(1)+'ms' : v.toFixed(0)+'µs');
+barChart('chartJitter', data, 'gapSD', 'Jitter \u2014 Gap StdDev (\u00b5s)', v => v.toFixed(0));
+barChart('chartBurst', data, 'burst', 'Burst Rate (%)', v => v.toFixed(1)+'%');
+barChart('chartMaxGap', data, 'gapMax', 'Max Inter-Packet Gap (\u00b5s)', v =>
+  v >= 1000 ? (v/1000).toFixed(1)+'ms' : v.toFixed(0)+'\u00b5s');
 
 // ── Jitter Diagnosis Data ──
 const diagData = [
@@ -486,23 +708,22 @@ diagData.forEach(d => {
   if (isOpen) tr.style('background', 'rgba(124,92,252,0.08)');
   tr.append('td').text(d.label);
   tr.append('td').text(d.pkts.toLocaleString());
-  tr.append('td').text(d.mean.toFixed(0) + 'µs');
-  const sdTd = tr.append('td').text(d.stdev.toFixed(0) + 'µs');
+  tr.append('td').text(d.mean.toFixed(0) + '\u00b5s');
+  const sdTd = tr.append('td').text(d.stdev.toFixed(0) + '\u00b5s');
   if (isOpen) sdTd.style('color', '#7c5cfc').style('font-weight', 'bold');
-  tr.append('td').text(d.p99.toFixed(0) + 'µs');
-  tr.append('td').text(d.max >= 10000 ? (d.max/1000).toFixed(1)+'ms' : d.max.toFixed(0) + 'µs');
+  tr.append('td').text(d.p99.toFixed(0) + '\u00b5s');
+  tr.append('td').text(d.max >= 10000 ? (d.max/1000).toFixed(1)+'ms' : d.max.toFixed(0) + '\u00b5s');
   tr.append('td').text(d.burst.toFixed(1) + '%');
   tr.append('td').text(d.normal.toFixed(1) + '%');
-  tr.append('td').text(d.pfJitter.toFixed(0) + 'µs');
+  tr.append('td').text(d.pfJitter.toFixed(0) + '\u00b5s');
 });
 
 // ── Histogram: All-Open vs Gated ──
 (function() {
   const histBins = ['<50', '50-200', '200-600', '600-780', '780-850', '850-1200', '>1200'];
-  // Approximate from diagnosis data
-  const openHist = [0.2, 0.3, 8.6, 35.7, 35.4, 12.4, 2.4];    // All-Open (100ms)
-  const gatedHist = [4.2, 7.2, 12.5, 4.5, 12.1, 56.5, 2.4];   // 1ms/50%
-  const lossHist = [56.5, 4.3, 2.9, 17.1, 12.3, 2.8, 3.6];    // 50ms/20%
+  const openHist = [0.2, 0.3, 8.6, 35.7, 35.4, 12.4, 2.4];
+  const gatedHist = [4.2, 7.2, 12.5, 4.5, 12.1, 56.5, 2.4];
+  const lossHist = [56.5, 4.3, 2.9, 17.1, 12.3, 2.8, 3.6];
 
   const svg = d3.select('#chartHistogram');
   const bbox = svg.node().getBoundingClientRect();
@@ -544,9 +765,8 @@ diagData.forEach(d => {
   g.append('text').attr('transform','rotate(-90)').attr('x',-h/2).attr('y',-45)
     .attr('text-anchor','middle').attr('fill','#8899aa').attr('font-size','12px').text('Packets (%)');
   g.append('text').attr('x',w/2).attr('y',h+45)
-    .attr('text-anchor','middle').attr('fill','#8899aa').attr('font-size','12px').text('Inter-Packet Gap (µs)');
+    .attr('text-anchor','middle').attr('fill','#8899aa').attr('font-size','12px').text('Inter-Packet Gap (\u00b5s)');
 
-  // Legend
   const leg = g.append('g').attr('transform', `translate(${w-250}, -10)`);
   datasets.forEach((ds, i) => {
     leg.append('rect').attr('x', i*90).attr('y',0).attr('width',10).attr('height',10).attr('fill',colors[ds.key]).attr('rx',2);
@@ -569,7 +789,6 @@ diagData.forEach(d => {
   g.selectAll('.grid-line').data(y.ticks(5)).enter()
     .append('line').attr('class','grid-line').attr('x1',0).attr('x2',w).attr('y1',d=>y(d)).attr('y2',d=>y(d));
 
-  // Error bars (min-max range)
   diagData.filter(d=>d.label!=='50ms / 20%').forEach(d => {
     const cx = x(d.label) + x.bandwidth()/2;
     g.append('line').attr('x1',cx).attr('x2',cx)
@@ -579,7 +798,6 @@ diagData.forEach(d => {
     g.append('line').attr('x1',cx-6).attr('x2',cx+6).attr('y1',y(d.pfMax)).attr('y2',y(d.pfMax)).attr('stroke','#445').attr('stroke-width',2);
   });
 
-  // Mean dots
   g.selectAll('.dot').data(diagData.filter(d=>d.label!=='50ms / 20%')).enter()
     .append('circle')
     .attr('cx', d => x(d.label) + x.bandwidth()/2)
@@ -588,15 +806,13 @@ diagData.forEach(d => {
     .attr('fill', d => d.label.startsWith('All-Open') ? '#7c5cfc' : '#00d2ff')
     .attr('stroke', '#fff').attr('stroke-width', 1.5);
 
-  // Value labels
   g.selectAll('.val').data(diagData.filter(d=>d.label!=='50ms / 20%')).enter()
     .append('text')
     .attr('x', d => x(d.label) + x.bandwidth()/2)
     .attr('y', d => y(d.pfJitter) - 12)
     .attr('text-anchor', 'middle').attr('fill', '#c8d6e5').attr('font-size', '10px')
-    .text(d => d.pfJitter.toFixed(0) + 'µs');
+    .text(d => d.pfJitter.toFixed(0) + '\u00b5s');
 
-  // Baseline band
   g.append('rect').attr('x',0).attr('y',y(182)).attr('width',w).attr('height',y(155)-y(182))
     .attr('fill','#7c5cfc').attr('opacity',0.1);
   g.append('text').attr('x',w-5).attr('y',y(175)).attr('text-anchor','end')
@@ -606,8 +822,421 @@ diagData.forEach(d => {
     .call(d3.axisBottom(x)).selectAll('text').attr('transform','rotate(-30)').style('text-anchor','end');
   g.append('g').attr('class','axis').call(d3.axisLeft(y).ticks(5));
   g.append('text').attr('transform','rotate(-90)').attr('x',-h/2).attr('y',-55)
-    .attr('text-anchor','middle').attr('fill','#8899aa').attr('font-size','12px').text('Per-Frame Jitter StdDev (µs)');
+    .attr('text-anchor','middle').attr('fill','#8899aa').attr('font-size','12px').text('Per-Frame Jitter StdDev (\u00b5s)');
 })();
+
+
+// ══════════════════════════════════════════════════════════════
+// COMPREHENSIVE TEST DATA
+// ══════════════════════════════════════════════════════════════
+
+const subMsData = [
+  { label: "100\u00b5s/80%", cycle: 100, openPct: 80, pkts: 12801, complete: 100, gapSD: 140, p99: 1253, gapMax: 1759, burst: 0.1, normal: 94.6 },
+  { label: "100\u00b5s/50%", cycle: 100, openPct: 50, pkts: 12801, complete: 100, gapSD: 159, p99: 1291, gapMax: 1817, burst: 0.2, normal: 92.7 },
+  { label: "250\u00b5s/80%", cycle: 250, openPct: 80, pkts: 12800, complete: 100, gapSD: 177, p99: 1275, gapMax: 1747, burst: 0.2, normal: 92.1 },
+  { label: "250\u00b5s/50%", cycle: 250, openPct: 50, pkts: 12801, complete: 100, gapSD: 90, p99: 1041, gapMax: 1357, burst: 0.0, normal: 99.9 },
+  { label: "500\u00b5s/80%", cycle: 500, openPct: 80, pkts: 12801, complete: 100, gapSD: 227, p99: 1353, gapMax: 1876, burst: 0.3, normal: 87.6 },
+  { label: "500\u00b5s/50%", cycle: 500, openPct: 50, pkts: 12801, complete: 100, gapSD: 310, p99: 1451, gapMax: 2151, burst: 1.1, normal: 71.5 },
+  { label: "750\u00b5s/80%", cycle: 750, openPct: 80, pkts: 12800, complete: 100, gapSD: 206, p99: 1349, gapMax: 1898, burst: 0.4, normal: 88.2 },
+  { label: "750\u00b5s/50%", cycle: 750, openPct: 50, pkts: 12801, complete: 100, gapSD: 226, p99: 1497, gapMax: 1953, burst: 1.0, normal: 87.2 },
+  { label: "781\u00b5s/80%", cycle: 781, openPct: 80, pkts: 12801, complete: 100, gapSD: 180, p99: 1317, gapMax: 1807, burst: 0.3, normal: 90.4 },
+  { label: "781\u00b5s/50%", cycle: 781, openPct: 50, pkts: 12801, complete: 100, gapSD: 206, p99: 1448, gapMax: 2040, burst: 0.8, normal: 88.4 },
+];
+
+const bufferData = [
+  { label: "10ms/20%", cycle: 10, close: 8, pkts: 12801, complete: 100, gapSD: 2287, p99: 8871, gapMax: 9436, burst: 73.6, pps: 1280 },
+  { label: "15ms/20%", cycle: 15, close: 12, pkts: 12802, complete: 100, gapSD: 164, p99: 1262, gapMax: 1814, burst: 0.1, pps: 1280 },
+  { label: "20ms/20%", cycle: 20, close: 16, pkts: 12468, complete: 100, gapSD: 3250, p99: 16834, gapMax: 17404, burst: 72.7, pps: 1247 },
+  { label: "25ms/20%", cycle: 25, close: 20, pkts: 0, complete: 0, gapSD: 0, p99: 0, gapMax: 0, burst: 0, pps: 0 },
+  { label: "30ms/20%", cycle: 30, close: 24, pkts: 9167, complete: 71.6, gapSD: 4588, p99: 24847, gapMax: 25888, burst: 64.9, pps: 917 },
+  { label: "35ms/20%", cycle: 35, close: 28, pkts: 0, complete: 0, gapSD: 0, p99: 0, gapMax: 0, burst: 0, pps: 0 },
+  { label: "40ms/20%", cycle: 40, close: 32, pkts: 7470, complete: 58.4, gapSD: 5843, p99: 32838, gapMax: 33353, burst: 59.7, pps: 747 },
+  { label: "45ms/20%", cycle: 45, close: 36, pkts: 0, complete: 0, gapSD: 0, p99: 0, gapMax: 0, burst: 0, pps: 0 },
+  { label: "50ms/20%", cycle: 50, close: 40, pkts: 6530, complete: 51.0, gapSD: 6973, p99: 40744, gapMax: 41375, burst: 55.7, pps: 653 },
+  { label: "50ms/25%", cycle: 50, close: 37.5, pkts: 12801, complete: 100, gapSD: 166, p99: 1267, gapMax: 1745, burst: 0.2, pps: 1280 },
+  { label: "50ms/30%", cycle: 50, close: 35, pkts: 7801, complete: 60.9, gapSD: 5572, p99: 35536, gapMax: 36453, burst: 46.1, pps: 780 },
+  { label: "50ms/35%", cycle: 50, close: 32.5, pkts: 12801, complete: 100, gapSD: 176, p99: 1272, gapMax: 1759, burst: 0.3, pps: 1280 },
+  { label: "50ms/40%", cycle: 50, close: 30, pkts: 9152, complete: 71.5, gapSD: 4428, p99: 30503, gapMax: 31903, burst: 39.6, pps: 915 },
+];
+
+const frameAlignedData = [
+  { label: "100ms/90%", close: 10, pkts: 12801, complete: 100, gapSD: 168, p99: 1262, gapMax: 1734, burst: 0.2, normal: 91.5 },
+  { label: "100ms/80%", close: 20, pkts: 12203, complete: 100, gapSD: 1827, p99: 1392, gapMax: 21077, burst: 14.5, normal: 77.8 },
+  { label: "100ms/70%", close: 30, pkts: 12801, complete: 100, gapSD: 177, p99: 1272, gapMax: 1965, burst: 0.2, normal: 90.4 },
+  { label: "100ms/60%", close: 40, pkts: 9676, complete: 100, gapSD: 4068, p99: 40308, gapMax: 41226, burst: 18.5, normal: 73.5 },
+  { label: "100ms/50%", close: 50, pkts: 12801, complete: 100, gapSD: 167, p99: 1266, gapMax: 1722, burst: 0.1, normal: 91.4 },
+];
+
+const multiGclData = [
+  { label: "10ms (2/6/2)", desc: "3-gate: 2ms open, 6ms close, 2ms open", openPct: 40, pkts: 12801, complete: 100, gapSD: 1730, p99: 6911, gapMax: 7225, burst: 50.9,
+    entries: [{g:'O',t:2},{g:'C',t:6},{g:'O',t:2}] },
+  { label: "10ms (1/8/1)", desc: "3-gate: 1ms open, 8ms close, 1ms open", openPct: 20, pkts: 0, complete: 0, gapSD: 0, p99: 0, gapMax: 0, burst: 0,
+    entries: [{g:'O',t:1},{g:'C',t:8},{g:'O',t:1}] },
+  { label: "20ms (5/5/5/5)", desc: "4-gate: alternating 5ms", openPct: 50, pkts: 12801, complete: 100, gapSD: 1454, p99: 5923, gapMax: 6456, burst: 44.6,
+    entries: [{g:'O',t:5},{g:'C',t:5},{g:'O',t:5},{g:'C',t:5}] },
+  { label: "100ms (30/20/30/20)", desc: "4-gate: frame split", openPct: 60, pkts: 0, complete: 0, gapSD: 0, p99: 0, gapMax: 0, burst: 0,
+    entries: [{g:'O',t:30},{g:'C',t:20},{g:'O',t:30},{g:'C',t:20}] },
+];
+
+const enduranceData = [
+  { label: "1ms/50%", dur: 60, pkts: 76801, complete: 100, gapSD: 358, p99: 1408, gapMax: 2312, burst: 5.8, normal: 73.3 },
+  { label: "10ms/20%", dur: 60, pkts: 76800, complete: 100, gapSD: 2293, p99: 8920, gapMax: 9736, burst: 73.3, normal: 10.8 },
+  { label: "50ms/20%", dur: 60, pkts: 0, complete: 0, gapSD: 0, p99: 0, gapMax: 0, burst: 0, normal: 0 },
+  { label: "781\u00b5s/50%", dur: 60, pkts: 76800, complete: 100, gapSD: 196, p99: 1457, gapMax: 2300, burst: 0.9, normal: 90.4 },
+  { label: "100ms/70%", dur: 60, pkts: 65661, complete: 100, gapSD: 2875, p99: 1520, gapMax: 31486, burst: 15.9, normal: 75.1 },
+];
+
+const boundaryData = [
+  { label: "1ms/99%", close: 10, pkts: 12801, complete: 100, gapSD: 152, p99: 1247, gapMax: 1673, burst: 0.1, normal: 92.7 },
+  { label: "1ms/98%", close: 20, pkts: 12800, complete: 100, gapSD: 164, p99: 1269, gapMax: 1754, burst: 0.1, normal: 92.5 },
+  { label: "1ms/95%", close: 50, pkts: 12800, complete: 100, gapSD: 199, p99: 1309, gapMax: 1796, burst: 0.3, normal: 88.5 },
+  { label: "1ms/90%", close: 100, pkts: 12801, complete: 100, gapSD: 217, p99: 1315, gapMax: 1716, burst: 0.2, normal: 86.5 },
+  { label: "200ms/80%", close: 40000, pkts: 11231, complete: 100, gapSD: 2672, p99: 1296, gapMax: 41442, burst: 8.0, normal: 83.5 },
+  { label: "500ms/50%", close: 250000, pkts: 12801, complete: 100, gapSD: 178, p99: 1280, gapMax: 1783, burst: 0.2, normal: 89.9 },
+];
+
+// ── Helper: build result table ──
+function buildTable(selId, dataset, columns) {
+  const tbl = d3.select('#' + selId);
+  const th = tbl.append('thead').append('tr');
+  columns.forEach(c => th.append('th').text(c.header));
+  const tb = tbl.append('tbody');
+  dataset.forEach(d => {
+    const tr = tb.append('tr');
+    if (d.complete >= 100) tr.classed('baseline', true);
+    columns.forEach(c => {
+      const td = tr.append('td');
+      const val = c.fn(d);
+      td.text(val);
+      if (c.loss && (d.complete < 100 || d.pkts === 0)) td.classed('loss', true);
+    });
+  });
+}
+
+// Sub-ms table
+buildTable('subMsTable', subMsData, [
+  { header: 'Config', fn: d => d.label },
+  { header: 'Cycle', fn: d => d.cycle + '\u00b5s' },
+  { header: 'Open%', fn: d => d.openPct + '%' },
+  { header: 'Cmpl%', fn: d => d.complete + '%', loss: true },
+  { header: 'Gap SD', fn: d => d.gapSD + '\u00b5s' },
+  { header: 'P99', fn: d => d.p99 + '\u00b5s' },
+  { header: 'Max Gap', fn: d => d.gapMax + '\u00b5s' },
+  { header: 'Burst%', fn: d => d.burst + '%' },
+  { header: 'Normal%', fn: d => d.normal + '%' },
+]);
+
+// Sub-ms jitter chart
+barChart('chartSubMsJitter', subMsData, 'gapSD', 'Gap StdDev (\u00b5s)', v => v.toFixed(0),
+  d => d.openPct >= 80 ? '#00e676' : '#00d2ff');
+
+// Buffer table
+buildTable('bufferTable', bufferData, [
+  { header: 'Config', fn: d => d.label },
+  { header: 'Close (ms)', fn: d => d.close + 'ms' },
+  { header: 'Packets', fn: d => d.pkts.toLocaleString() },
+  { header: 'Cmpl%', fn: d => d.complete + '%', loss: true },
+  { header: 'PPS', fn: d => d.pps.toFixed(0) },
+  { header: 'Gap SD', fn: d => d.gapSD ? d.gapSD + '\u00b5s' : '\u2014' },
+  { header: 'Max Gap', fn: d => d.gapMax ? (d.gapMax >= 10000 ? (d.gapMax/1000).toFixed(1)+'ms' : d.gapMax+'\u00b5s') : '\u2014' },
+  { header: 'Burst%', fn: d => d.burst + '%' },
+]);
+
+// Buffer threshold chart
+(function() {
+  const svg = d3.select('#chartBufferThreshold');
+  const bbox = svg.node().getBoundingClientRect();
+  const margin = { top: 30, right: 80, bottom: 50, left: 70 };
+  const w = bbox.width - margin.left - margin.right;
+  const h = 320 - margin.top - margin.bottom;
+  const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+  // Close time sweep (first 9 entries)
+  const sweepData = bufferData.slice(0, 9);
+  const x = d3.scaleBand().domain(sweepData.map(d=>d.label)).range([0, w*0.6]).padding(0.2);
+  const y = d3.scaleLinear().domain([0, 105]).range([h, 0]);
+
+  g.selectAll('.grid-line').data(y.ticks(5)).enter()
+    .append('line').attr('class','grid-line').attr('x1',0).attr('x2',w).attr('y1',d=>y(d)).attr('y2',d=>y(d));
+
+  // Danger zone
+  g.append('rect').attr('x', 0).attr('y', y(50)).attr('width', w).attr('height', y(0)-y(50))
+    .attr('fill', '#ff5252').attr('opacity', 0.05);
+  g.append('text').attr('x', w-5).attr('y', y(25)).attr('text-anchor','end')
+    .attr('fill', '#ff5252').attr('font-size', '9px').attr('opacity', 0.5).text('Danger Zone');
+
+  // Bars
+  sweepData.forEach(d => {
+    g.append('rect')
+      .attr('x', x(d.label))
+      .attr('y', y(d.complete))
+      .attr('width', x.bandwidth())
+      .attr('height', h - y(d.complete))
+      .attr('fill', d.complete === 0 ? '#ff5252' : d.complete < 100 ? '#ffab40' : '#00e676')
+      .attr('rx', 3)
+      .attr('opacity', 0.85);
+
+    g.append('text')
+      .attr('x', x(d.label) + x.bandwidth()/2)
+      .attr('y', d.complete === 0 ? y(5) : y(d.complete) - 5)
+      .attr('text-anchor', 'middle')
+      .attr('fill', d.complete === 0 ? '#ff5252' : '#c8d6e5')
+      .attr('font-size', '10px')
+      .text(d.complete === 0 ? '0%' : d.complete + '%');
+  });
+
+  // Open% sweep (last 4 entries) on right side
+  const sweepData2 = bufferData.slice(9);
+  const x2 = d3.scaleBand().domain(sweepData2.map(d=>d.label)).range([w*0.65, w]).padding(0.2);
+
+  sweepData2.forEach(d => {
+    g.append('rect')
+      .attr('x', x2(d.label))
+      .attr('y', y(d.complete))
+      .attr('width', x2.bandwidth())
+      .attr('height', h - y(d.complete))
+      .attr('fill', d.complete === 0 ? '#ff5252' : d.complete < 100 ? '#ffab40' : '#00e676')
+      .attr('rx', 3)
+      .attr('opacity', 0.85);
+
+    g.append('text')
+      .attr('x', x2(d.label) + x2.bandwidth()/2)
+      .attr('y', d.complete === 0 ? y(5) : y(d.complete) - 5)
+      .attr('text-anchor', 'middle')
+      .attr('fill', d.complete === 0 ? '#ff5252' : '#c8d6e5')
+      .attr('font-size', '10px')
+      .text(d.complete === 0 ? '0%' : d.complete + '%');
+  });
+
+  // Labels
+  g.append('text').attr('x', w*0.3).attr('y', -10).attr('text-anchor','middle')
+    .attr('fill', '#8899aa').attr('font-size', '11px').text('Close Time Sweep (20% open)');
+  g.append('text').attr('x', w*0.825).attr('y', -10).attr('text-anchor','middle')
+    .attr('fill', '#8899aa').attr('font-size', '11px').text('Open% Sweep (50ms cycle)');
+
+  // Separator line
+  g.append('line').attr('x1', w*0.625).attr('x2', w*0.625)
+    .attr('y1', 0).attr('y2', h).attr('stroke', '#1e2a42').attr('stroke-dasharray', '5,5');
+
+  g.append('g').attr('class','axis').attr('transform',`translate(0,${h})`)
+    .call(d3.axisBottom(x)).selectAll('text').attr('transform','rotate(-35)').style('text-anchor','end');
+
+  const xAxis2 = g.append('g').attr('class','axis').attr('transform',`translate(0,${h})`)
+    .call(d3.axisBottom(x2)).selectAll('text').attr('transform','rotate(-35)').style('text-anchor','end');
+
+  g.append('g').attr('class','axis').call(d3.axisLeft(y).ticks(5));
+  g.append('text').attr('transform','rotate(-90)').attr('x',-h/2).attr('y',-55)
+    .attr('text-anchor','middle').attr('fill','#8899aa').attr('font-size','12px').text('Completeness (%)');
+})();
+
+// Frame-aligned table
+buildTable('frameAlignedTable', frameAlignedData, [
+  { header: 'Config', fn: d => d.label },
+  { header: 'Close (ms)', fn: d => d.close + 'ms' },
+  { header: 'Packets', fn: d => d.pkts.toLocaleString() },
+  { header: 'Cmpl%', fn: d => d.complete + '%', loss: true },
+  { header: 'Gap SD', fn: d => d.gapSD + '\u00b5s' },
+  { header: 'Max Gap', fn: d => d.gapMax >= 10000 ? (d.gapMax/1000).toFixed(1)+'ms' : d.gapMax+'\u00b5s' },
+  { header: 'Burst%', fn: d => d.burst + '%' },
+  { header: 'Normal%', fn: d => d.normal + '%' },
+]);
+
+// Frame-aligned chart
+barChart('chartFrameAligned', frameAlignedData, 'gapSD', 'Gap StdDev (\u00b5s)', v => v.toFixed(0),
+  d => d.gapSD > 500 ? '#ffab40' : '#00d2ff');
+
+// Multi-GCL table
+buildTable('multiGclTable', multiGclData, [
+  { header: 'Config', fn: d => d.label },
+  { header: 'Description', fn: d => d.desc },
+  { header: 'Open%', fn: d => d.openPct + '%' },
+  { header: 'Packets', fn: d => d.pkts.toLocaleString() },
+  { header: 'Cmpl%', fn: d => d.complete + '%', loss: true },
+  { header: 'Gap SD', fn: d => d.gapSD ? d.gapSD + '\u00b5s' : '\u2014' },
+  { header: 'Burst%', fn: d => d.burst + '%' },
+]);
+
+// Multi-GCL Gate Gantt
+(function() {
+  const svg = d3.select('#chartMultiGcl');
+  const bbox = svg.node().getBoundingClientRect();
+  const margin = { top: 20, right: 30, bottom: 30, left: 200 };
+  const w = bbox.width - margin.left - margin.right;
+  const h = 250 - margin.top - margin.bottom;
+  const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+  const y = d3.scaleBand().domain(multiGclData.map(d=>d.label)).range([0, h]).padding(0.3);
+
+  multiGclData.forEach(d => {
+    const totalMs = d.entries.reduce((s,e) => s + e.t, 0);
+    const xScale = d3.scaleLinear().domain([0, totalMs]).range([0, w]);
+    let offset = 0;
+
+    d.entries.forEach(e => {
+      g.append('rect')
+        .attr('x', xScale(offset))
+        .attr('y', y(d.label))
+        .attr('width', xScale(e.t))
+        .attr('height', y.bandwidth())
+        .attr('fill', e.g === 'O' ? '#00e676' : '#ff5252')
+        .attr('opacity', 0.7)
+        .attr('rx', 3);
+
+      g.append('text')
+        .attr('x', xScale(offset) + xScale(e.t)/2)
+        .attr('y', y(d.label) + y.bandwidth()/2 + 4)
+        .attr('text-anchor', 'middle')
+        .attr('fill', '#fff')
+        .attr('font-size', '10px')
+        .text(e.t + 'ms');
+
+      offset += e.t;
+    });
+
+    // Status
+    const statusColor = d.complete > 0 ? '#00e676' : '#ff5252';
+    const statusText = d.complete > 0 ? '100%' : '0%';
+    g.append('text')
+      .attr('x', w + 10)
+      .attr('y', y(d.label) + y.bandwidth()/2 + 4)
+      .attr('fill', statusColor)
+      .attr('font-size', '12px')
+      .attr('font-weight', 'bold')
+      .text(statusText);
+  });
+
+  g.append('g').attr('class','axis').call(d3.axisLeft(y));
+
+  // Legend
+  const leg = g.append('g').attr('transform', `translate(0, ${h+10})`);
+  leg.append('rect').attr('x',0).attr('y',0).attr('width',10).attr('height',10).attr('fill','#00e676').attr('opacity',0.7);
+  leg.append('text').attr('x',14).attr('y',9).attr('fill','#c8d6e5').attr('font-size','10px').text('Gate Open');
+  leg.append('rect').attr('x',100).attr('y',0).attr('width',10).attr('height',10).attr('fill','#ff5252').attr('opacity',0.7);
+  leg.append('text').attr('x',114).attr('y',9).attr('fill','#c8d6e5').attr('font-size','10px').text('Gate Close');
+})();
+
+// Endurance table
+buildTable('enduranceTable', enduranceData, [
+  { header: 'Config', fn: d => d.label },
+  { header: 'Duration', fn: d => d.dur + 's' },
+  { header: 'Packets', fn: d => d.pkts.toLocaleString() },
+  { header: 'Cmpl%', fn: d => d.complete + '%', loss: true },
+  { header: 'Gap SD', fn: d => d.gapSD ? d.gapSD + '\u00b5s' : '\u2014' },
+  { header: 'P99', fn: d => d.p99 ? d.p99 + '\u00b5s' : '\u2014' },
+  { header: 'Max Gap', fn: d => d.gapMax ? (d.gapMax >= 10000 ? (d.gapMax/1000).toFixed(1)+'ms' : d.gapMax+'\u00b5s') : '\u2014' },
+  { header: 'Burst%', fn: d => d.burst + '%' },
+  { header: 'Normal%', fn: d => d.normal + '%' },
+]);
+
+// Boundary table
+buildTable('boundaryTable', boundaryData, [
+  { header: 'Config', fn: d => d.label },
+  { header: 'Close', fn: d => d.close >= 1000 ? (d.close/1000).toFixed(0)+'ms' : d.close+'\u00b5s' },
+  { header: 'Packets', fn: d => d.pkts.toLocaleString() },
+  { header: 'Cmpl%', fn: d => d.complete + '%', loss: true },
+  { header: 'Gap SD', fn: d => d.gapSD + '\u00b5s' },
+  { header: 'P99', fn: d => d.p99 + '\u00b5s' },
+  { header: 'Max Gap', fn: d => d.gapMax >= 10000 ? (d.gapMax/1000).toFixed(1)+'ms' : d.gapMax+'\u00b5s' },
+  { header: 'Burst%', fn: d => d.burst + '%' },
+  { header: 'Normal%', fn: d => d.normal + '%' },
+]);
+
+// ── Comprehensive Heatmap ──
+(function() {
+  // Combine all tests into a close_time vs completeness view
+  const allTests = [
+    // From original sweep + comprehensive
+    { label: "1ms/80%", close_ms: 0.2, complete: 100 },
+    { label: "1ms/50%", close_ms: 0.5, complete: 100 },
+    { label: "1ms/20%", close_ms: 0.8, complete: 100 },
+    { label: "5ms/80%", close_ms: 1, complete: 100 },
+    { label: "5ms/50%", close_ms: 2.5, complete: 100 },
+    { label: "5ms/20%", close_ms: 4, complete: 100 },
+    { label: "10ms/80%", close_ms: 2, complete: 100 },
+    { label: "10ms/50%", close_ms: 5, complete: 100 },
+    { label: "10ms/20%", close_ms: 8, complete: 100 },
+    { label: "50ms/80%", close_ms: 10, complete: 100 },
+    { label: "50ms/50%", close_ms: 25, complete: 100 },
+    { label: "50ms/20%", close_ms: 40, complete: 51 },
+    // New buffer mapping
+    { label: "15ms/20%", close_ms: 12, complete: 100 },
+    { label: "20ms/20%", close_ms: 16, complete: 100 },
+    { label: "25ms/20%", close_ms: 20, complete: 0 },
+    { label: "30ms/20%", close_ms: 24, complete: 72 },
+    { label: "35ms/20%", close_ms: 28, complete: 0 },
+    { label: "40ms/20%", close_ms: 32, complete: 58 },
+    { label: "45ms/20%", close_ms: 36, complete: 0 },
+    // Frame-aligned
+    { label: "100ms/90%", close_ms: 10, complete: 100 },
+    { label: "100ms/80%", close_ms: 20, complete: 100 },
+    { label: "100ms/70%", close_ms: 30, complete: 100 },
+    { label: "100ms/60%", close_ms: 40, complete: 100 },
+    { label: "100ms/50%", close_ms: 50, complete: 100 },
+    // Boundary
+    { label: "200ms/80%", close_ms: 40, complete: 100 },
+    { label: "500ms/50%", close_ms: 250, complete: 100 },
+  ];
+
+  const svg = d3.select('#chartHeatmap');
+  const bbox = svg.node().getBoundingClientRect();
+  const margin = { top: 20, right: 30, bottom: 50, left: 70 };
+  const w = bbox.width - margin.left - margin.right;
+  const h = 400 - margin.top - margin.bottom;
+  const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+  // Scatter plot: close_ms vs completeness
+  const x = d3.scaleLog().domain([0.1, 300]).range([0, w]);
+  const y = d3.scaleLinear().domain([-5, 105]).range([h, 0]);
+
+  g.selectAll('.grid-line').data(y.ticks(5)).enter()
+    .append('line').attr('class','grid-line').attr('x1',0).attr('x2',w).attr('y1',d=>y(d)).attr('y2',d=>y(d));
+
+  // Danger threshold line at close=16ms
+  g.append('line')
+    .attr('x1', x(16)).attr('x2', x(16))
+    .attr('y1', 0).attr('y2', h)
+    .attr('stroke', '#ff5252').attr('stroke-dasharray', '5,5').attr('opacity', 0.5);
+  g.append('text').attr('x', x(16)+5).attr('y', 15)
+    .attr('fill', '#ff5252').attr('font-size', '9px').text('16ms threshold');
+
+  // Points
+  g.selectAll('circle').data(allTests).enter()
+    .append('circle')
+    .attr('cx', d => x(Math.max(0.1, d.close_ms)))
+    .attr('cy', d => y(d.complete))
+    .attr('r', 7)
+    .attr('fill', d => d.complete >= 100 ? '#00e676' : d.complete > 0 ? '#ffab40' : '#ff5252')
+    .attr('stroke', '#fff')
+    .attr('stroke-width', 1)
+    .attr('opacity', 0.8);
+
+  // Labels for interesting points
+  allTests.filter(d => d.complete < 100 || d.close_ms >= 100).forEach(d => {
+    g.append('text')
+      .attr('x', x(Math.max(0.1, d.close_ms)) + 10)
+      .attr('y', y(d.complete) + 4)
+      .attr('fill', '#c8d6e5')
+      .attr('font-size', '9px')
+      .text(d.label);
+  });
+
+  g.append('g').attr('class','axis').attr('transform',`translate(0,${h})`)
+    .call(d3.axisBottom(x).tickValues([0.1, 0.5, 1, 2, 5, 10, 20, 50, 100, 250])
+      .tickFormat(d => d >= 1 ? d+'ms' : (d*1000)+'\u00b5s'));
+  g.append('g').attr('class','axis').call(d3.axisLeft(y).ticks(5));
+  g.append('text').attr('x', w/2).attr('y', h+40).attr('text-anchor','middle')
+    .attr('fill','#8899aa').attr('font-size','12px').text('Gate Close Time');
+  g.append('text').attr('transform','rotate(-90)').attr('x',-h/2).attr('y',-55)
+    .attr('text-anchor','middle').attr('fill','#8899aa').attr('font-size','12px').text('Completeness (%)');
+
+  // Legend
+  const leg = g.append('g').attr('transform', `translate(${w-200}, 0)`);
+  [['#00e676','100%'],['#ffab40','Partial'],['#ff5252','0% (Total Loss)']].forEach((d,i) => {
+    leg.append('circle').attr('cx',0).attr('cy',i*18).attr('r',5).attr('fill',d[0]);
+    leg.append('text').attr('x',10).attr('y',i*18+4).attr('fill','#c8d6e5').attr('font-size','10px').text(d[1]);
+  });
+})();
+
 </script>
 </body>
 </html>
