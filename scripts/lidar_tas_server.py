@@ -50,6 +50,8 @@ tas_state = {
     'open_us': 1000,
     'close_us': 0,
     'open_pct': 100,
+    'mode': 'single',
+    'entries': [{'gate': 255, 'duration_us': 1000}],
 }
 
 # Stats — raw per-frame + EMA smoothed for display
@@ -67,53 +69,9 @@ stats_history = deque(maxlen=300)
 
 
 # ── keti-tsn-cli TAS Control ──
-def apply_tas(cycle_us, open_us):
-    """Apply TAS config to LAN9662 via keti-tsn-cli."""
-    close_us = cycle_us - open_us
+def _patch_tas_yaml(content):
+    """Patch live TAS YAML through keti-tsn-cli."""
     yaml_path = os.path.join(KETI_TSN_DIR, 'lidar-tas', '_live_config.yaml')
-
-    if close_us <= 0:
-        # All gates open (TAS "disabled")
-        content = '''- ? "/ietf-interfaces:interfaces/interface[name='1']/ieee802-dot1q-bridge:bridge-port/ieee802-dot1q-sched-bridge:gate-parameter-table"
-  : gate-enabled: true
-    admin-gate-states: 255
-    admin-cycle-time:
-      numerator: 1000000
-      denominator: 1000000000
-    admin-base-time:
-      seconds: 0
-      nanoseconds: 0
-    admin-control-list:
-      gate-control-entry:
-        - index: 0
-          operation-name: set-gate-states
-          gate-states-value: 255
-          time-interval-value: 1000000
-    config-change: true
-'''
-    else:
-        content = f'''- ? "/ietf-interfaces:interfaces/interface[name='1']/ieee802-dot1q-bridge:bridge-port/ieee802-dot1q-sched-bridge:gate-parameter-table"
-  : gate-enabled: true
-    admin-gate-states: 255
-    admin-cycle-time:
-      numerator: {cycle_us * 1000}
-      denominator: 1000000000
-    admin-base-time:
-      seconds: 0
-      nanoseconds: 0
-    admin-control-list:
-      gate-control-entry:
-        - index: 0
-          operation-name: set-gate-states
-          gate-states-value: 255
-          time-interval-value: {open_us * 1000}
-        - index: 1
-          operation-name: set-gate-states
-          gate-states-value: 254
-          time-interval-value: {close_us * 1000}
-    config-change: true
-'''
-
     with open(yaml_path, 'w') as f:
         f.write(content)
 
@@ -121,14 +79,89 @@ def apply_tas(cycle_us, open_us):
         ['./keti-tsn', 'patch', yaml_path],
         cwd=KETI_TSN_DIR, capture_output=True, text=True, timeout=30
     )
-    ok = 'Failed' not in result.stdout and result.returncode == 0
+    return 'Failed' not in result.stdout and result.returncode == 0
+
+
+def _normalize_entries(cycle_us, entries):
+    """Normalize/validate entry list."""
+    if cycle_us <= 0:
+        raise ValueError("cycle_us must be > 0")
+    if not entries:
+        raise ValueError("entries must not be empty")
+
+    normalized = []
+    total = 0
+    for e in entries:
+        gate = int(e.get('gate', 255))
+        dur = int(e.get('duration_us', 0))
+        if gate < 0 or gate > 255:
+            raise ValueError("gate must be 0..255")
+        if dur < 0:
+            raise ValueError("duration_us must be >= 0")
+        if dur == 0:
+            continue
+        normalized.append({'gate': gate, 'duration_us': dur})
+        total += dur
+
+    if not normalized:
+        raise ValueError("all entry durations are 0")
+    if total != cycle_us:
+        raise ValueError(f"sum(duration_us)={total} must equal cycle_us={cycle_us}")
+    return normalized
+
+
+def apply_tas_entries(cycle_us, entries):
+    """Apply arbitrary TAS gate-control list in microseconds."""
+    normalized = _normalize_entries(cycle_us, entries)
+    lines = [
+        "- ? \"/ietf-interfaces:interfaces/interface[name='1']/ieee802-dot1q-bridge:bridge-port/ieee802-dot1q-sched-bridge:gate-parameter-table\"",
+        "  : gate-enabled: true",
+        "    admin-gate-states: 255",
+        "    admin-cycle-time:",
+        f"      numerator: {cycle_us * 1000}",
+        "      denominator: 1000000000",
+        "    admin-base-time:",
+        "      seconds: 0",
+        "      nanoseconds: 0",
+        "    admin-control-list:",
+        "      gate-control-entry:",
+    ]
+    for i, e in enumerate(normalized):
+        lines.extend([
+            f"        - index: {i}",
+            "          operation-name: set-gate-states",
+            f"          gate-states-value: {e['gate']}",
+            f"          time-interval-value: {e['duration_us'] * 1000}",
+        ])
+    lines.append("    config-change: true")
+    content = "\n".join(lines) + "\n"
+
+    ok = _patch_tas_yaml(content)
     if ok:
+        open_us = sum(e['duration_us'] for e in normalized if e['gate'] == 255)
+        close_us = max(0, cycle_us - open_us)
         tas_state['enabled'] = close_us > 0
         tas_state['cycle_us'] = cycle_us
         tas_state['open_us'] = open_us
         tas_state['close_us'] = close_us
-        tas_state['open_pct'] = round(open_us / cycle_us * 100) if cycle_us > 0 else 100
+        tas_state['open_pct'] = round(open_us / cycle_us * 100)
+        tas_state['entries'] = normalized
+        tas_state['mode'] = 'multi' if len(normalized) > 2 else 'single'
     return ok
+
+
+def apply_tas(cycle_us, open_us):
+    """Apply classic 2-entry TAS config to LAN9662 via keti-tsn-cli."""
+    open_us = max(0, min(int(open_us), int(cycle_us)))
+    close_us = int(cycle_us) - open_us
+    if close_us <= 0:
+        entries = [{'gate': 255, 'duration_us': int(cycle_us)}]
+    else:
+        entries = [
+            {'gate': 255, 'duration_us': open_us},
+            {'gate': 254, 'duration_us': close_us},
+        ]
+    return apply_tas_entries(int(cycle_us), entries)
 
 
 # ── HTML Template ──
@@ -270,6 +303,7 @@ HTML_TEMPLATE = '''
             <div style="font-size:0.72rem;color:var(--text3);margin-bottom:6px;">Cycle Time</div>
             <div class="gate-presets" id="cyclePresets">
                 <button class="gate-btn active" onclick="setCycle(1000,this)">1ms</button>
+                <button class="gate-btn" onclick="setCycle(781,this)">781us</button>
                 <button class="gate-btn" onclick="setCycle(5000,this)">5ms</button>
                 <button class="gate-btn" onclick="setCycle(10000,this)">10ms</button>
                 <button class="gate-btn" onclick="setCycle(50000,this)">50ms</button>
@@ -297,6 +331,22 @@ HTML_TEMPLATE = '''
             </div>
             <button class="run-btn" id="applyBtn" onclick="applyGate()" style="margin-top:4px;background:var(--green);">
                 Apply to Switch
+            </button>
+            <div class="gate-presets" style="margin-top:8px;">
+                <button class="gate-btn green" onclick="applyPreset781150()">781/150</button>
+                <button class="gate-btn" onclick="applyPreset78130Center()">781/30 center</button>
+                <button class="gate-btn" onclick="applyPreset781Block()">781/block</button>
+                <button class="gate-btn" onclick="syncUIToState()">sync</button>
+            </div>
+            <div style="font-size:0.72rem;color:var(--text3);margin-top:8px;margin-bottom:4px;">3-slot (open-close-open)</div>
+            <div class="info-grid" style="grid-template-columns: auto 1fr auto 1fr;">
+                <span class="info-k">O1</span><input id="slotOpen1" type="number" min="0" step="1" value="15" style="width:100%;padding:4px 6px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:0.72rem;">
+                <span class="info-k">C</span><input id="slotClose" type="number" min="0" step="1" value="751" style="width:100%;padding:4px 6px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:0.72rem;">
+                <span class="info-k">O2</span><input id="slotOpen2" type="number" min="0" step="1" value="15" style="width:100%;padding:4px 6px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:0.72rem;">
+                <span class="info-k">Cycle</span><input id="slotCycle" type="number" min="1" step="1" value="781" style="width:100%;padding:4px 6px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:0.72rem;">
+            </div>
+            <button class="run-btn" id="applyMultiBtn" onclick="applyThreeSlot()" style="margin-top:6px;background:#0ea5e9;">
+                Apply 3-slot
             </button>
 
             <div class="timing-desc" id="timingDesc">
@@ -392,9 +442,9 @@ HTML_TEMPLATE = '''
     let scene, camera, renderer, controls, pointCloud, chart;
     let currentCycle = 1000, currentOpenPct = 100;
 
-    function setCycle(us, btn) {
+    function setCycle(us, btn=null) {
         document.querySelectorAll('#cyclePresets .gate-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
+        if (btn) btn.classList.add('active');
         currentCycle = us;
         updateSliderRange();
         updateGateViz();
@@ -442,6 +492,93 @@ HTML_TEMPLATE = '''
             desc.innerHTML = `Cycle ${cycleLabel}: Open ${pct}% (${openUs}&micro;s) / Close ${closeUs}&micro;s<br>` +
                 `Switch buffers ~${(closeUs/781).toFixed(1)} pkts during close, releases on open`;
         }
+    }
+
+    async function applyMultiGate(cycleUs, entries, label) {
+        const status = document.getElementById('applyStatus');
+        status.style.display = 'block';
+        status.className = 'applying';
+        status.style.color = 'var(--orange)';
+        status.textContent = 'Applying to switch...';
+        try {
+            const r = await fetch('/api/gate_multi', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({cycle_us: cycleUs, entries: entries})
+            });
+            const d = await r.json();
+            if (!d.ok) throw new Error(d.error || 'unknown');
+            status.className = '';
+            status.style.color = 'var(--green)';
+            status.textContent = `Applied: ${label} (${d.desc})`;
+            setTimeout(() => { status.style.display = 'none'; }, 3000);
+            syncUIToState();
+        } catch (e) {
+            status.className = '';
+            status.style.color = 'var(--red)';
+            status.textContent = 'Error: ' + e.message;
+        }
+    }
+
+    function applyPreset781150() {
+        setCycle(781);
+        document.getElementById('openSlider').value = 150;
+        updateSliderDisplay();
+        applyGate();
+    }
+
+    function applyPreset78130Center() {
+        const entries = [
+            {gate: 255, duration_us: 15},
+            {gate: 254, duration_us: 751},
+            {gate: 255, duration_us: 15}
+        ];
+        applyMultiGate(781, entries, '781/30 center');
+    }
+
+    function applyPreset781Block() {
+        const entries = [{gate: 254, duration_us: 781}];
+        applyMultiGate(781, entries, '781 block');
+    }
+
+    async function applyThreeSlot() {
+        const cycleUs = parseInt(document.getElementById('slotCycle').value);
+        const o1 = parseInt(document.getElementById('slotOpen1').value);
+        const c = parseInt(document.getElementById('slotClose').value);
+        const o2 = parseInt(document.getElementById('slotOpen2').value);
+        const total = o1 + c + o2;
+        if (total !== cycleUs) {
+            const status = document.getElementById('applyStatus');
+            status.style.display = 'block';
+            status.className = '';
+            status.style.color = 'var(--red)';
+            status.textContent = `3-slot sum mismatch: O1+C+O2=${total}, cycle=${cycleUs}`;
+            return;
+        }
+        const entries = [
+            {gate: 255, duration_us: o1},
+            {gate: 254, duration_us: c},
+            {gate: 255, duration_us: o2}
+        ];
+        await applyMultiGate(cycleUs, entries, `3-slot ${o1}/${c}/${o2}`);
+    }
+
+    async function syncUIToState() {
+        try {
+            const s = await (await fetch('/api/tas_state')).json();
+            currentCycle = parseInt(s.cycle_us || 1000);
+            const openUs = parseInt(s.open_us || currentCycle);
+            document.getElementById('openSlider').max = currentCycle;
+            document.getElementById('openSlider').value = Math.min(openUs, currentCycle);
+            document.getElementById('slotCycle').value = currentCycle;
+
+            if (Array.isArray(s.entries) && s.entries.length >= 3) {
+                document.getElementById('slotOpen1').value = s.entries[0].duration_us || 0;
+                document.getElementById('slotClose').value = s.entries[1].duration_us || 0;
+                document.getElementById('slotOpen2').value = s.entries[2].duration_us || 0;
+            }
+            updateSliderDisplay();
+        } catch (_) {}
     }
 
     async function applyGate() {
@@ -613,7 +750,7 @@ HTML_TEMPLATE = '''
         }).catch(()=>{}).finally(()=>setTimeout(pollStats, 250));
     }
 
-    initScene(); initChart(); pollPoints(); pollStats();
+    initScene(); initChart(); syncUIToState(); pollPoints(); pollStats();
 </script>
 </body>
 </html>
@@ -864,8 +1001,9 @@ def get_stats_raw():
 @app.route('/api/gate', methods=['POST'])
 def set_gate():
     d = flask_request.json or {}
-    cycle_us = int(d.get('cycle_us', 1000))
+    cycle_us = max(1, int(d.get('cycle_us', 1000)))
     open_us = int(d.get('open_us', cycle_us))
+    open_us = max(0, min(open_us, cycle_us))
     close_us = cycle_us - open_us
 
     print(f"[API] Applying TAS: cycle={cycle_us}us, open={open_us}us, close={close_us}us")
@@ -876,6 +1014,29 @@ def set_gate():
         return jsonify({'ok': True, 'desc': desc, **tas_state})
     else:
         return jsonify({'ok': False, 'error': 'keti-tsn-cli patch failed'})
+
+
+@app.route('/api/gate_multi', methods=['POST'])
+def set_gate_multi():
+    d = flask_request.json or {}
+    cycle_us = max(1, int(d.get('cycle_us', 1000)))
+    entries = d.get('entries', [])
+    if not isinstance(entries, list):
+        return jsonify({'ok': False, 'error': 'entries must be a list'})
+
+    try:
+        normalized = _normalize_entries(cycle_us, entries)
+    except ValueError as e:
+        return jsonify({'ok': False, 'error': str(e)})
+
+    print(f"[API] Applying TAS multi: cycle={cycle_us}us, entries={normalized}")
+    ok = apply_tas_entries(cycle_us, normalized)
+    if not ok:
+        return jsonify({'ok': False, 'error': 'keti-tsn-cli patch failed'})
+
+    open_us = sum(e['duration_us'] for e in normalized if e['gate'] == 255)
+    desc = f"cycle={cycle_us}us, open={open_us}us ({open_us*100//cycle_us}%), entries={len(normalized)}"
+    return jsonify({'ok': True, 'desc': desc, **tas_state})
 
 @app.route('/api/tas_state')
 def get_tas_state():
